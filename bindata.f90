@@ -327,7 +327,7 @@ program main
 			read(iFileIn,'(A512)',iostat=iEOF) cBuffer
 			if(cBuffer(1:1).NE."#")then
 				read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
-											rDummy, rDummy, rDummy, iNScat, iNRScat, rDelay, iExtracted
+											iNScat, iNRScat, rDelay, iExtracted
 
 				if(iErr.GT.0)then
 					iErr=0
@@ -381,7 +381,7 @@ program main
 		if(cBuffer(1:1).NE."#")then
 			iPhot=iPhot+1
 			read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
-										rDummy, rDummy, rDummy, iNScat, iNRScat, rDelay, iExtracted, iObserver
+										iNScat, iNRScat, rDelay, iExtracted, iObserver
 			if(bAllScat)iNRScat=iNScat
 
 			if(iErr.GT.0)then
@@ -552,7 +552,7 @@ program main
 	write(iFileOut,'(A)')'set y2tics ('//trim(r2c(rMinY))//', '//trim(r2c(rMinY+.25*rRngY))//&
 					', '//trim(r2c(rMinY+.5*rRngY))//', '//trim(r2c(rMinY+.75*rRngY))//&
 					', '//trim(r2c(rMaxY))//') mirror format '//trim(cTicks)
-	if(.NOT.bNoTicks)write(iFileOut,'(A)')'set y2label "Path (cm)"'
+	if(.NOT.bNoTicks)write(iFileOut,'(A)')'set y2label "Delay (seconds)"'
 
 	write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_Y" u 2:1 w l notitle'
 
