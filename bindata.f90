@@ -195,9 +195,9 @@ program main
 				print *,"ERROR: Observer argument '"//trim(cArg)//"' invalid!"
 				STOP
 			endif
-			iArg=iArg+1
+			iArg=iArg+2
 
-			call get_command_argument(iArg+1, cArg)
+			call get_command_argument(iArg, cArg)
 			read(cArg,*,iostat=iErr)iObserverMax
 			if(iErr.NE.0)then
 				!Nothing
