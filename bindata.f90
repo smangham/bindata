@@ -9,9 +9,10 @@ program main
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
 	integer				:: iDimX=100, iDimY=100, iDimR=100
 	integer				:: i,j,iErr=0, iEOF=0, iDummy, iBinX, iBinY, iBinR, iPhot=0,iPhotR=0, iPhotRE=0,iExtracted
-	integer				:: iNScat, iNRScat, iNScatMin=1, iNScatMax=999, iScat, iArg=1,iLine=0, iObserver, iObserverSelect=0
-	integer, allocatable			:: aiMap(:,:),aiMapX(:),aiMapY(:),aiMapR(:)
-	real(iKindDP), allocatable		:: arMap(:,:),arMapX(:),arMapY(:),arBinX(:),arBinY(:)
+	integer				:: iNScat, iNRScat, iNScatMin=1, iNScatMax=999, iScat, iArg=1,iLine=0
+	integer 			:: iObserver, iObserverMin=0, iObserverMax=0, iObservers=1, iObs
+	integer, allocatable			:: aiMap(:,:,:),aiMapX(:,:),aiMapY(:,:),aiMapR(:)
+	real(iKindDP), allocatable		:: arMap(:,:,:),arMapX(:,:),arMapY(:,:),arBinX(:),arBinY(:)
 	real(iKindDP)		:: rDummy, rLambda, rWeight, rDelay, rPosX,rPosY,rPosZ,rErr
 	real(iKindDP)		:: rMinX=-1., rMaxX=-1., rMinY=-1., rMaxY=-1., rRngX=-1., rRngY=-1., rMinR=-1.,rMaxR=-1., rRngR=-1.
 	real(iKindDP)		:: rMinP=1e300_iKindDP, rMaxP=0.,rMinI=1e300_iKindDP,rMaxI=0.,rRad=-1, rTemp=0.0
@@ -189,12 +190,26 @@ program main
 
 		else if(cArg.EQ."-obs".OR.cArg.EQ."-OBS")then
 			call get_command_argument(iArg+1, cArg)
-			read(cArg,*,iostat=iErr)iObserverSelect
-			if(iErr.NE.0 .OR.iObserverSelect.LT.0)then
+			read(cArg,*,iostat=iErr)iObserverMin
+			if(iErr.NE.0 .OR.iObserverMin.LT.0)then
 				print *,"ERROR: Observer argument '"//trim(cArg)//"' invalid!"
 				STOP
 			endif
-			iArg=iArg+2
+			iArg=iArg+1
+
+			call get_command_argument(iArg+1, cArg)
+			read(cArg,*,iostat=iErr)iObserverMax
+			if(iErr.NE.0)then
+				!Nothing
+			else if(iObserverMax.LT.iObserverMin)then
+				iObserver = iObserverMin
+				iObserverMin = iObserverMax
+				iObserverMax = iObserver	
+				iArg=iArg+1							
+			else
+				iObserverMax = iObserverMin
+				iArg=iArg+1				
+			endif
 
 		else if(cArg.EQ."-bg".OR.cArg.EQ."-BG")then
 			iArg=iArg+1
@@ -262,8 +277,10 @@ program main
 	rRngY=rMaxY-rMinY
 	rRngR=rMaxR-rMinR
 
-	allocate(aiMapX(iDimX), aiMapY(iDimY), aiMapR(iDimR), aiMap(iDimX,iDimY))
-	allocate(arMapX(iDimX), arMapY(iDimY), arMapR(iDimR), arMap(iDimX,iDimY))
+	iObservers = 1 +(iObserverMax - iObserverMin)
+
+	allocate(aiMapX(iDimX,iObservers), aiMapY(iDimY,iObservers), aiMapR(iDimR), aiMap(iDimX,iDimY,iObservers))
+	allocate(arMapX(iDimX,iObservers), arMapY(iDimY,iObservers), arMapR(iDimR), arMap(iDimX,iDimY,iObservers))
 	allocate(arBinX(iDimX+1), arBinY(iDimY+1))
 
 	do i=0,iDimX
@@ -398,7 +415,7 @@ program main
 				!Do nothing
 			elseif(iExtracted.EQ.0 .AND.bUseExtracted)then
 				!Do nothing
-			elseif(iObserver.NE.iObserverSelect)then
+			elseif(iObserver.LT.iObserverMin.OR.iObserver.GT.iObserverMax)then
 				!Do nothing
 
 			else if(iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax.AND.iNScat.LE.iNScatMax)then
@@ -424,12 +441,12 @@ program main
 						iBinR	= ifLookupIndex(arBinR, rRad)
 						if(iBinR .GT. -1)then
 							rWeight = arReweightMult(iBinR) * rWeight * rRad**(-1.5)
-							aiMap(iBinX,iBinY) = aiMap(iBinX,iBinY) + 1
-							arMap(iBinX,iBinY) = arMap(iBinX,iBinY) + rWeight
-							aiMapX(iBinX) = aiMapX(iBinX) + 1
-							arMapX(iBinX) = arMapX(iBinX) + rWeight
-							aiMapY(iBinY) = aiMapY(iBinY) + 1
-							arMapY(iBinY) = arMapY(iBinY) + rWeight
+							aiMap(iBinX,iBinY,iObserver+1) 	= aiMap(iBinX,iBinY,iObserver+1) + 1
+							arMap(iBinX,iBinY,iObserver+1) 	= arMap(iBinX,iBinY,iObserver+1) + rWeight
+							aiMapX(iBinX,iObserver+1) 		= aiMapX(iBinX,iObserver+1) + 1
+							arMapX(iBinX,iObserver+1) 		= arMapX(iBinX,iObserver+1) + rWeight
+							aiMapY(iBinY,iObserver+1) 		= aiMapY(iBinY,iObserver+1) + 1
+							arMapY(iBinY,iObserver+1) 		= arMapY(iBinY,iObserver+1) + rWeight
 						else
 							iErrWeight=iErrWeight+1
 							if(iErrWeight.LT.10)then
@@ -440,19 +457,19 @@ program main
 							endif
 						endif
 					else
-						aiMap(iBinX,iBinY) = aiMap(iBinX,iBinY) + 1
-						arMap(iBinX,iBinY) = arMap(iBinX,iBinY) + rWeight
-						aiMapX(iBinX) = aiMapX(iBinX) + 1
-						arMapX(iBinX) = arMapX(iBinX) + rWeight
-						aiMapY(iBinY) = aiMapY(iBinY) + 1
-						arMapY(iBinY) = arMapY(iBinY) + rWeight
+						aiMap(iBinX,iBinY,iObserver+1) = 	aiMap(iBinX,iBinY,iObserver+1) + 1
+						arMap(iBinX,iBinY,iObserver+1) = 	arMap(iBinX,iBinY,iObserver+1) + rWeight
+						aiMapX(iBinX,iObserver+1) = 		aiMapX(iBinX,iObserver+1) + 1
+						arMapX(iBinX,iObserver+1) = 		arMapX(iBinX,iObserver+1) + rWeight
+						aiMapY(iBinY,iObserver+1) = 		aiMapY(iBinY,iObserver+1) + 1
+						arMapY(iBinY,iObserver+1) = 		arMapY(iBinY,iObserver+1) + rWeight
 					endif
 
 				endif
 			endif
 		endif
 	end do
-	print '(1X,A,ES9.3,X,ES9.3)','Maximum path traveled [raw/radii]: ',rPathMax,rPathMax/rMaxR
+	!print '(1X,A,ES9.3,X,ES9.3)','Maximum path traveled [raw/radii]: ',rPathMax,rPathMax/rMaxR
 
 	close(iFileIn)
 
@@ -464,121 +481,129 @@ program main
 		print *,'ERROR: No photons fit scattering parameters'
 		STOP
 	endif
-	print '(X,A)',"Writing to "//trim(cFileOut)//".eps"
 
-	open(iFileOut,file=trim(cFileOut)//".bin_XY",status="REPLACE",action="WRITE")
-	do j=1,iDimY
-		rPosY = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
+	do iObs=iObserverMin+1,iObserverMax+1
+		print '(X,A)',"Writing to "//trim(cFileOut)//".eps"
+
+		open(iFileOut,file=trim(cFileOut)//".bin_XY",status="REPLACE",action="WRITE")
+		do j=1,iDimY
+			rPosY = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
+			do i=1,iDimX
+				rPosX = rMinX+(i-.5)*(rMaxX-rMinX)/real(iDimX)
+				if(aiMap(i,j,iObs).GT.0 .AND. arMap(i,j,iObs).GT.0) then 
+					rErr = sqrt(REAL(aiMap(i,j,iObs)))/aiMap(i,j,iObs)
+					write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosY, arMap(i,j,iObs), rErr
+				else
+					write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosY, 0.0, 1.0
+				endif
+			end do
+		end do
+		close(iFileOut)
+
+		open(iFileOut,file=trim(cFileOut)//".bin_X",status="REPLACE",action="WRITE")
 		do i=1,iDimX
 			rPosX = rMinX+(i-.5)*(rMaxX-rMinX)/real(iDimX)
-			if(aiMap(i,j).GT.0 .AND. arMap(i,j).GT.0) then 
-				rErr = sqrt(REAL(aiMap(i,j)))/aiMap(i,j)
-				write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosY, arMap(i,j), rErr
+			if(aiMapX(i,iObs).GT.0 .AND. arMapX(i,iObs).GT.0) then 
+				rErr = sqrt(REAL(aiMapX(i,iObs)))/aiMapX(i,iObs)	
+				write(iFileOut,'(3(ES12.5,1X))') rPosX, arMapX(i,iObs), rErr
 			else
-				write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosY, 0.0, 1.0
+				write(iFileOut,'(3(ES12.5,1X))') rPosX, 0.0, 1.0
 			endif
 		end do
-	end do
-	close(iFileOut)
+		close(iFileOut)
 
-	open(iFileOut,file=trim(cFileOut)//".bin_X",status="REPLACE",action="WRITE")
-	do i=1,iDimX
-		rPosX = rMinX+(i-.5)*(rMaxX-rMinX)/real(iDimX)
-		if(aiMapX(i).GT.0 .AND. arMapX(i).GT.0) then 
-			rErr = sqrt(REAL(aiMapX(i)))/aiMapX(i)	
-			write(iFileOut,'(3(ES12.5,1X))') rPosX, arMapX(i), rErr
+		open(iFileOut,file=trim(cFileOut)//".bin_Y",status="REPLACE",action="WRITE")
+		do i=1,iDimY
+			rPosY = rMinY+(i-.5)*(rMaxY-rMinY)/real(iDimY)
+			if(aiMapY(i,iObs).GT.0 .AND. arMapY(i,iObs).GT.0) then 
+				rErr = sqrt(REAL(aiMapY(i,iObs)))/aiMapY(i,iObs)
+				write(iFileOut,'(3(ES12.5,1X))') rPosY, arMapY(i,iObs), rErr
+			else
+				write(iFileOut,'(3(ES12.5,1X))') rPosY, 0.0, 1.0
+			endif
+		end do
+		close(iFileOut)
+
+		open(iFileOut,file=trim(cFileOut)//".plot",status="REPLACE",action="WRITE")
+		write(iFileOut,'(A)')'set term postscript eps color enhanced'
+		if(iObservers.GT.1)then
+			write(iFileOut,'(A,I0,A)')'set output "'//trim(cFileOut)//'.',iObs-1,'.eps"'
 		else
-			write(iFileOut,'(3(ES12.5,1X))') rPosX, 0.0, 1.0
+			write(iFileOut,'(A)')'set output "'//trim(cFileOut)//'.eps"'
+		endif
+		write(iFileOut,'(A)')'set multiplot'
+		write(iFileOut,'(A)')'set bmargin 0; set tmargin 0; set lmargin 0; set rmargin 0'
+		if(.NOT.bNoLog) write(iFileOut,'(A)')'set log cb'
+		write(iFileOut,'(A)')'set colorbox user origin 0.65,0.05 size .05,0.3'
+		write(iFileOut,'(A)')'set cblabel "Flux (erg s^{-1} cm^{2})"'
+		if(bNoKey)then
+			write(iFileOut,'(A)')'unset colorbox'		
+		endif
+
+		write(iFileOut,'(A)')'set origin 0.1,0.4'
+		write(iFileOut,'(A)')'set size 0.5,0.5'
+		write(iFileOut,'(A)')'set xrange ['//trim(r2c(rMinX))//':'//trim(r2c(rMaxX))//']'
+		write(iFileOut,'(A)')'set yrange ['//trim(r2c(rMinY))//':'//trim(r2c(rMaxY))//']'
+
+		write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
+						', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
+						', '//trim(r2c(rMaxX))//') mirror format ""'
+		write(iFileOut,'(A)')'unset xlabel'
+		write(iFileOut,'(A)')'set ytics ('//trim(r2c(rMinY))//', '//trim(r2c(rMinY+.25*rRngY))//&
+						', '//trim(r2c(rMinY+.5*rRngY))//', '//trim(r2c(rMinY+.75*rRngY))//&
+						', '//trim(r2c(rMaxY))//') mirror format ""'
+		write(iFileOut,'(A)')'unset ylabel'
+		write(iFileOut,'(A)')'set tics front'
+		write(iFileOut,'(A)')'set palette rgb -34,-35,-36'
+		write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3 w ima notitle'
+
+		write(iFileOut,'(A)')'set origin 0.6,0.4'
+		write(iFileOut,'(A)')'set size 0.15,0.5'
+		write(iFileOut,'(A)')'set xrange [*:*] reverse'
+		write(iFileOut,'(A)')'set yrange ['//trim(r2c(rMinY))//':'//trim(r2c(rMaxY))//']'
+
+		write(iFileOut,'(A)')'set xtics autofreq format ""'
+		write(iFileOut,'(A)')'unset xlabel'
+		write(iFileOut,'(A)')'unset ytics'
+		write(iFileOut,'(A)')'unset ylabel'
+		write(iFileOut,'(A)')'unset colorbox'
+		write(iFileOut,'(A)')'unset log x'
+		write(iFileOut,'(A)')'unset log y'
+		write(iFileOut,'(A)')'unset log cb'
+
+
+		write(iFileOut,'(A)')'set y2tics ('//trim(r2c(rMinY))//', '//trim(r2c(rMinY+.25*rRngY))//&
+						', '//trim(r2c(rMinY+.5*rRngY))//', '//trim(r2c(rMinY+.75*rRngY))//&
+						', '//trim(r2c(rMaxY))//') mirror format '//trim(cTicks)
+		if(.NOT.bNoTicks)write(iFileOut,'(A)')'set y2label "Delay (seconds)"'
+
+		write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_Y" u 2:1 w l notitle'
+
+		write(iFileOut,'(A)')'set origin 0.1,0.25'
+		write(iFileOut,'(A)')'set size 0.5,0.15'
+		write(iFileOut,'(A)')'set xrange ['//trim(r2c(rMinX))//':'//trim(r2c(rMaxX))//'] noreverse'
+		write(iFileOut,'(A)')'set yrange [*:*]'
+
+		if(.NOT.bNoTicks)write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
+		write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
+						', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
+						', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)
+		write(iFileOut,'(A)')'set ytics autofreq format ""'
+		write(iFileOut,'(A)')'unset ylabel'
+		write(iFileOut,'(A)')'unset y2tics'
+		write(iFileOut,'(A)')'unset y2label'
+		write(iFileOut,'(A)')'unset log x'
+		write(iFileOut,'(A)')'unset log y'
+
+		write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_X" u 1:2 w l notitle'
+		close(iFileOut)
+
+		call  EXECUTE_COMMAND_LINE('gnuplot '//trim(cFileOut)//'.plot')
+		if(.NOT.bMessy)then
+			call EXECUTE_COMMAND_LINE('rm '//trim(cFileOut)//'.bin_* '//trim(cFileOut)//'.plot ')
 		endif
 	end do
-	close(iFileOut)
 
-	open(iFileOut,file=trim(cFileOut)//".bin_Y",status="REPLACE",action="WRITE")
-	do i=1,iDimY
-		rPosY = rMinY+(i-.5)*(rMaxY-rMinY)/real(iDimY)
-		if(aiMapY(i).GT.0 .AND. arMapY(i).GT.0) then 
-			rErr = sqrt(REAL(aiMapY(i)))/aiMapY(i)
-			write(iFileOut,'(3(ES12.5,1X))') rPosY, arMapY(i), rErr
-		else
-			write(iFileOut,'(3(ES12.5,1X))') rPosY, 0.0, 1.0
-		endif
-	end do
-	close(iFileOut)
-
-	open(iFileOut,file=trim(cFileOut)//".plot",status="REPLACE",action="WRITE")
-	write(iFileOut,'(A)')'set term postscript eps color enhanced'
-	write(iFileOut,'(A)')'set output "'//trim(cFileOut)//'.eps"'
-	write(iFileOut,'(A)')'set multiplot'
-	write(iFileOut,'(A)')'set bmargin 0; set tmargin 0; set lmargin 0; set rmargin 0'
-	if(.NOT.bNoLog) write(iFileOut,'(A)')'set log cb'
-	write(iFileOut,'(A)')'set colorbox user origin 0.65,0.05 size .05,0.3'
-	write(iFileOut,'(A)')'set cblabel "Flux (erg s^{-1} cm^{2})"'
-	if(bNoKey)then
-		write(iFileOut,'(A)')'unset colorbox'		
-	endif
-
-	write(iFileOut,'(A)')'set origin 0.1,0.4'
-	write(iFileOut,'(A)')'set size 0.5,0.5'
-	write(iFileOut,'(A)')'set xrange ['//trim(r2c(rMinX))//':'//trim(r2c(rMaxX))//']'
-	write(iFileOut,'(A)')'set yrange ['//trim(r2c(rMinY))//':'//trim(r2c(rMaxY))//']'
-
-	write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
-					', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
-					', '//trim(r2c(rMaxX))//') mirror format ""'
-	write(iFileOut,'(A)')'unset xlabel'
-	write(iFileOut,'(A)')'set ytics ('//trim(r2c(rMinY))//', '//trim(r2c(rMinY+.25*rRngY))//&
-					', '//trim(r2c(rMinY+.5*rRngY))//', '//trim(r2c(rMinY+.75*rRngY))//&
-					', '//trim(r2c(rMaxY))//') mirror format ""'
-	write(iFileOut,'(A)')'unset ylabel'
-	write(iFileOut,'(A)')'set tics front'
-	write(iFileOut,'(A)')'set palette rgb -34,-35,-36'
-	write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3 w ima notitle'
-
-	write(iFileOut,'(A)')'set origin 0.6,0.4'
-	write(iFileOut,'(A)')'set size 0.15,0.5'
-	write(iFileOut,'(A)')'set xrange [*:*] reverse'
-	write(iFileOut,'(A)')'set yrange ['//trim(r2c(rMinY))//':'//trim(r2c(rMaxY))//']'
-
-	write(iFileOut,'(A)')'set xtics autofreq format ""'
-	write(iFileOut,'(A)')'unset xlabel'
-	write(iFileOut,'(A)')'unset ytics'
-	write(iFileOut,'(A)')'unset ylabel'
-	write(iFileOut,'(A)')'unset colorbox'
-	write(iFileOut,'(A)')'unset log x'
-	write(iFileOut,'(A)')'unset log y'
-	write(iFileOut,'(A)')'unset log cb'
-
-
-	write(iFileOut,'(A)')'set y2tics ('//trim(r2c(rMinY))//', '//trim(r2c(rMinY+.25*rRngY))//&
-					', '//trim(r2c(rMinY+.5*rRngY))//', '//trim(r2c(rMinY+.75*rRngY))//&
-					', '//trim(r2c(rMaxY))//') mirror format '//trim(cTicks)
-	if(.NOT.bNoTicks)write(iFileOut,'(A)')'set y2label "Delay (seconds)"'
-
-	write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_Y" u 2:1 w l notitle'
-
-	write(iFileOut,'(A)')'set origin 0.1,0.25'
-	write(iFileOut,'(A)')'set size 0.5,0.15'
-	write(iFileOut,'(A)')'set xrange ['//trim(r2c(rMinX))//':'//trim(r2c(rMaxX))//'] noreverse'
-	write(iFileOut,'(A)')'set yrange [*:*]'
-
-	if(.NOT.bNoTicks)write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
-	write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
-					', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
-					', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)
-	write(iFileOut,'(A)')'set ytics autofreq format ""'
-	write(iFileOut,'(A)')'unset ylabel'
-	write(iFileOut,'(A)')'unset y2tics'
-	write(iFileOut,'(A)')'unset y2label'
-	write(iFileOut,'(A)')'unset log x'
-	write(iFileOut,'(A)')'unset log y'
-
-	write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_X" u 1:2 w l notitle'
-	close(iFileOut)
-
-	call  EXECUTE_COMMAND_LINE('gnuplot '//trim(cFileOut)//'.plot')
-	if(.NOT.bMessy)then
-		call EXECUTE_COMMAND_LINE('rm '//trim(cFileOut)//'.bin_* '//trim(cFileOut)//'.plot ')
-	endif
 	print *,"Finished"
 
 contains
