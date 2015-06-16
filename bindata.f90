@@ -143,13 +143,13 @@ program main
 		else if(cArg.EQ."-p".OR.cArg.EQ."-P")then
 			call get_command_argument(iArg+1, cArg)
 			read(cArg,*,iostat=iErr)rMinY
-			if(iErr.NE.0 .OR.rMinY.LT.0)then
+			if(iErr.NE.0)then
 				print *,"ERROR: Minimum path argument '"//trim(cArg)//"' invalid!"
 				STOP
 			endif
 			call get_command_argument(iArg+2, cArg)
 			read(cArg,*,iostat=iErr)rMaxY
-			if(iErr.NE.0 .OR.rMaxY.LT.rMinY)then
+			if(iErr.NE.0 .OR. rMaxY.LT.rMinY)then
 				print *,"ERROR: Maximum path argument '"//trim(cArg)//"' invalid!"
 				STOP
 			endif
