@@ -19,7 +19,7 @@ program main
 	character(len=32) 	:: cFileIn="",cFileOut="", cDummy, cArg, cTicks='"%g"'
 	character(len=512)  :: cBuffer
 
-	logical 			:: bReweight=.FALSE., bReweightBinLog=.FALSE., bReweightBinGeom=.FALSE.
+	logical 			:: bReweight=.FALSE., bReweightBinLog=.FALSE., bReweightBinGeom=.FALSE., bLookupY=.TRUE.
 	integer				:: iReweightGeom
 	real(iKindDP)		:: rReweightPow, rReweightBase
 	real(iKindDP), allocatable	:: arMapR(:),arBinR(:),arPosR(:),arReweightMult(:)
@@ -153,6 +153,7 @@ program main
 				print *,"ERROR: Maximum path argument '"//trim(cArg)//"' invalid!"
 				STOP
 			endif
+			bLookupY=.FALSE.
 			iArg=iArg+3
 
 		else if(cArg.EQ."-s".OR.cArg.EQ."-S")then
@@ -257,7 +258,7 @@ program main
 		print *,"ERROR: Input file '"//trim(cFileIn)//".delay_dump' does not exist!"
 		STOP
 	endif
-	if(rMinY.LT.0 .AND. rMinR.LT.0 .AND. bReweight)then
+	if(bLookupY .AND. rMinR.LT.0 .AND. bReweight)then
 		rRad  = rfGetKeyword(trim(cFileIn)//".pf","rstar")							!Units = cm
 		rMinR = rfGetKeyword(trim(cFileIn)//".pf","wind_keplerian.diskmin")*rRad 	!Units = rstar
 		rMaxR = rfGetKeyword(trim(cFileIn)//".pf","wind_keplerian.diskmax")*rRad 	!Units = rstar
@@ -267,7 +268,7 @@ program main
 		rMaxX = rfGetKeyword(trim(cFileIn)//".pf","spectrum_wavemax")
 		print '(X,A,ES8.2,A,ES8.2,A,I0,A)','Binning wavelengths from ',rMinX,' to ',rMaxX,' in ',iDimX,' steps'
 	endif
-	if(rMinY.LT.0)then
+	if(bLookupY)then
 		rRad = rfGetKeyword(trim(cFileIn)//".pf","wind.radmax")
 		rMinY= rRad*0.50
 		rMaxY= rRad*4.50
