@@ -279,6 +279,7 @@ program main
 	rRngR=rMaxR-rMinR
 
 	iObservers = 1 +(iObserverMax - iObserverMin)
+	print *,'Plotting observers ',iObserverMin,' to ',iObserverMax
 
 	allocate(aiMapX(iDimX,iObservers), aiMapY(iDimY,iObservers), aiMapR(iDimR), aiMap(iDimX,iDimY,iObservers))
 	allocate(arMapX(iDimX,iObservers), arMapY(iDimY,iObservers), arMapR(iDimR), arMap(iDimX,iDimY,iObservers))
