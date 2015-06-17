@@ -16,7 +16,7 @@ program main
 	real(iKindDP)		:: rDummy, rLambda, rWeight, rDelay, rPosX,rPosY,rPosZ,rErr
 	real(iKindDP)		:: rMinX=-1., rMaxX=-1., rMinY=-1., rMaxY=-1., rRngX=-1., rRngY=-1., rMinR=-1.,rMaxR=-1., rRngR=-1.
 	real(iKindDP)		:: rMinP=1e300_iKindDP, rMaxP=0.,rMinI=1e300_iKindDP,rMaxI=0.,rRad=-1, rTemp=0.0
-	character(len=32) 	:: cFileIn="",cFileOut="", cDummy, cArg, cTicks='"%g"'
+	character(len=512) 	:: cFileIn="",cFileOut="", cDummy, cArg, cTicks='"%g"'
 	character(len=512)  :: cBuffer
 
 	logical 			:: bReweight=.FALSE., bReweightBinLog=.FALSE., bReweightBinGeom=.FALSE., bLookupY=.TRUE.
@@ -484,7 +484,11 @@ program main
 	endif
 
 	do iObs=iObserverMin+1,iObserverMax+1
-		print '(X,A)',"Writing to "//trim(cFileOut)//".eps"
+		if(iObservers.GT.1)then
+			print '(A,I0,A)','Writing to "'//trim(cFileOut)//'.',iObs-1,'.eps"'
+		else
+			print '(A)','Writing to "'//trim(cFileOut)//'.eps"'
+		endif
 
 		open(iFileOut,file=trim(cFileOut)//".bin_XY",status="REPLACE",action="WRITE")
 		do j=1,iDimY
