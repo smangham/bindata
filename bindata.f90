@@ -3,7 +3,7 @@ program main
 
 	integer, parameter 				:: iFileIn=100,iFileOut=101
 	integer, parameter 				:: iKindDP=selected_real_kind(15,300)
-	real(iKindDP), parameter 		:: rcPi = DACOS(-1.D0)
+	real(iKindDP), parameter 		:: rcPi = DACOS(-1.D0), rSecsToDays=86400
 
 	logical				:: bFound, bMessy=.FALSE., bNoKey=.FALSE., bNoTicks=.FALSE.
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
@@ -25,7 +25,6 @@ program main
 	real(iKindDP), allocatable	:: arMapR(:),arBinR(:),arPosR(:),arReweightMult(:)
 
 	integer				:: iErrWeight=0, iErrMalf=0, iErrLog=0
-
 	real(iKindDP)		:: rPathMax=0;
 
 	if(command_argument_count().EQ.0)then
@@ -288,7 +287,7 @@ program main
 		arBinX(i+1)=rMinX+i*(rMaxX-rMinX)/real(iDimX)
 	end do
 	do i=0,iDimY
-		arBinY(i+1)=rMinY+i*(rMaxY-rMinY)/real(iDimY)
+		arBinY(i+1)=(rMinY+i*(rMaxY-rMinY)/real(iDimY)) / rSecsToDays
 	end do
 
 	aiMap=0
@@ -425,7 +424,7 @@ program main
 				iPhotR= iPhotR+1
 				iPhotRE=iPhotRE+iExtracted
 				iBinX = ifLookupIndex(arBinX,rLambda)
-				iBinY = ifLookupIndex(arBinY,rDelay)
+				iBinY = ifLookupIndex(arBinY,rDelay/rSecsToDays)
 				if(iBinX.LT.1 .OR. iBinY.LT.1)then
 					iErrLog=iErrLog+1
 					if(iErrLog.LT.10) then
@@ -580,7 +579,7 @@ program main
 		write(iFileOut,'(A)')'set y2tics ('//trim(r2c(rMinY))//', '//trim(r2c(rMinY+.25*rRngY))//&
 						', '//trim(r2c(rMinY+.5*rRngY))//', '//trim(r2c(rMinY+.75*rRngY))//&
 						', '//trim(r2c(rMaxY))//') mirror format '//trim(cTicks)
-		if(.NOT.bNoTicks)write(iFileOut,'(A)')'set y2label "Delay (seconds)"'
+		if(.NOT.bNoTicks)write(iFileOut,'(A)')'set y2label "Delay (days)"'
 
 		write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_Y" u 2:1 w l notitle'
 
