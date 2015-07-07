@@ -3,7 +3,7 @@ program main
 
 	integer, parameter 				:: iFileIn=100,iFileOut=101
 	integer, parameter 				:: iKindDP=selected_real_kind(15,300)
-	real(iKindDP), parameter 		:: rcPi = DACOS(-1.D0), rSecsToDays=86400
+	real(iKindDP), parameter 		:: rcPi = DACOS(-1.D0), rSecsToDays=86400.0
 
 	logical				:: bFound, bMessy=.FALSE., bNoKey=.FALSE., bNoTicks=.FALSE.
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
@@ -272,6 +272,8 @@ program main
 		rMaxY= rRad*4.50
 		print '(X,A,ES8.2,A,ES8.2,A,I0,A)','Binning paths from ',rMinY,' to ',rMaxY,'cm in ',iDimY,' steps'
 	endif
+	rMaxY=rMaxY/rSecsToDays
+	rMinY=rMinY/rSecsToDays
 	rRngX=rMaxX-rMinX
 	rRngY=rMaxY-rMinY
 	rRngR=rMaxR-rMinR
@@ -287,7 +289,7 @@ program main
 		arBinX(i+1)=rMinX+i*(rMaxX-rMinX)/real(iDimX)
 	end do
 	do i=0,iDimY
-		arBinY(i+1)=(rMinY+i*(rMaxY-rMinY)/real(iDimY)) / rSecsToDays
+		arBinY(i+1)=rMinY+i*(rMaxY-rMinY)/real(iDimY)
 	end do
 
 	aiMap=0
@@ -419,7 +421,7 @@ program main
 				!Do nothing
 
 			else if(iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax.AND.iNScat.LE.iNScatMax)then
-				if(rDelay.GT.rPathMax)rPathMax=rDelay !DEBUG
+				if(rDelay.GT.rPathMax)rPathMax=rDelay/rSecsToDays !DEBUG
 
 				iPhotR= iPhotR+1
 				iPhotRE=iPhotRE+iExtracted
