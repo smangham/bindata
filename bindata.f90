@@ -5,11 +5,11 @@ program main
 	integer, parameter 				:: iKindDP=selected_real_kind(15,300)
 	real(iKindDP), parameter 		:: rcPi = DACOS(-1.D0), rSecsToDays=86400.0
 
-	logical				:: bFound, bMessy=.FALSE., bNoKey=.FALSE., bNoTicks=.FALSE.
+	logical				:: bFound, bMessy=.FALSE., bNoKey=.FALSE., bNoTicks=.FALSE., bUseMatom=.FALSE.
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
 	integer				:: iDimX=100, iDimY=100, iDimR=100
 	integer				:: i,j,iErr=0, iEOF=0, iDummy, iBinX, iBinY, iBinR, iPhot=0,iPhotR=0, iPhotRE=0,iExtracted
-	integer				:: iNScat, iNRScat, iNScatMin=1, iNScatMax=999, iScat, iArg=1,iLine=0
+	integer				:: iNScat, iNRScat, iNScatMin=1, iNScatMax=999, iScat, iArg=1,iLine=0, iOrigin
 	integer 			:: iObserver, iObserverMin=0, iObserverMax=0, iObservers=1, iObs
 	integer, allocatable			:: aiMap(:,:,:),aiMapX(:,:),aiMapY(:,:),aiMapR(:)
 	real(iKindDP), allocatable		:: arMap(:,:,:),arMapX(:,:),arMapY(:,:),arBinX(:),arBinY(:)
@@ -75,6 +75,9 @@ program main
 		print *,""
 		print *,"	-m"
 		print *,"Messy, do not delete intermediate files."
+		print *,""		
+		print *,"	-matom"
+		print *,"Matom mode: Use all matom photons."
 		print *,""		
 		print *,"	-nk"
 		print *,"No key, remove colour key from plots."
@@ -217,6 +220,10 @@ program main
 			iArg=iArg+1
 			bReweightBinLog=.TRUE.
 
+
+		else if(cArg.EQ."-matom".OR.cArg.EQ."-Matom")then
+			bUseMatom=.TRUE.
+			iArg=iArg+1
 		else if(cArg.EQ."-e".OR.cArg.EQ."-E")then
 			bUseExtracted=.TRUE.
 			iArg=iArg+1
@@ -405,7 +412,7 @@ program main
 		if(cBuffer(1:1).NE."#")then
 			iPhot=iPhot+1
 			read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
-										iNScat, iNRScat, rDelay, iExtracted, iObserver
+										iNScat, iNRScat, rDelay, iExtracted, iObserver, iOrigin
 			if(bAllScat)iNRScat=iNScat
 
 			if(iErr.GT.0)then
@@ -425,7 +432,7 @@ program main
 			elseif(iObserver.LT.iObserverMin.OR.iObserver.GT.iObserverMax)then
 				!Do nothing
 
-			else if(iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax.AND.iNScat.LE.iNScatMax)then
+			else if((iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax) .OR. (bUseMatom.AND.iOrigin.GE.10))then
 				if(rDelay.GT.rPathMax)rPathMax=rDelay/rSecsToDays !DEBUG
 
 				iPhotR= iPhotR+1
