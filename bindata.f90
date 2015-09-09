@@ -9,7 +9,7 @@ program main
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
 	integer				:: iDimX=100, iDimY=100, iDimR=100
 	integer				:: i,j,iErr=0, iEOF=0, iDummy, iBinX, iBinY, iBinR, iPhot=0,iPhotR=0, iPhotRE=0,iExtracted
-	integer				:: iNScat, iNRScat, iNScatMin=1, iNScatMax=999, iScat, iArg=1,iLine=0, iOrigin
+	integer				:: iNScat, iNRScat, iNScatMin=1, iNScatMax=999, iScat, iArg=1,iLine=0, iOrigin, iPhotMatom=0
 	integer 			:: iObserver, iObserverMin=0, iObserverMax=0, iObservers=1, iObs
 	integer, allocatable			:: aiMap(:,:,:),aiMapX(:,:),aiMapY(:,:),aiMapR(:)
 	real(iKindDP), allocatable		:: arMap(:,:,:),arMapX(:,:),arMapY(:,:),arBinX(:),arBinY(:)
@@ -431,9 +431,12 @@ program main
 				!Do nothing
 			elseif(iObserver.LT.iObserverMin.OR.iObserver.GT.iObserverMax)then
 				!Do nothing
+			elseif(.NOT.bUseMatom .AND. iOrigin.GE.10)then
+				!Do nothing
 
-			else if((iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax) .OR. (bUseMatom.AND.iOrigin.GE.10))then
+			else if((iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax).OR.iOrigin.GE.10)then
 				if(rDelay.GT.rPathMax)rPathMax=rDelay/rSecsToDays !DEBUG
+				if(iOrigin.GE.10)iPhotMatom=iPhotMatom+1
 
 				iPhotR= iPhotR+1
 				iPhotRE=iPhotRE+iExtracted
@@ -490,7 +493,10 @@ program main
 	if(iErrLog.GT.0) print '(X,A,I0,A)',"WARNING: ",iErrLog," points lay outside the map range."
 	if(iErrMalf.GT.0)print '(X,A,I0,A)',"WARNING: ",iErrMalf," lines in the file were malformed."
 
-	print '(X,I0,A,I0,A,I0,A)',iPhotR,"/",iPhot," photons resonance scattered, of which ",iPhotRE," were extracted."
+	print '(X,I0,A,I0,A,I0,A)',iPhotR,"/",iPhot," photons scattered."
+	if(bUseExtracted) print '(X,A,I0,A)', " of which ",iPhotRE," were extracted."
+	if(bUseMatom) print '(X,A,I0,A)', " of which ",iPhotMatom," were from macro-atoms."
+
 	if(iPhotR.EQ.0)then
 		print *,'ERROR: No photons fit scattering parameters'
 		STOP
