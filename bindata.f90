@@ -431,10 +431,8 @@ program main
 				!Do nothing
 			elseif(iObserver.LT.iObserverMin.OR.iObserver.GT.iObserverMax)then
 				!Do nothing
-			elseif(.NOT.bUseMatom .AND. iOrigin.GE.10)then
-				!Do nothing
 
-			else if((iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax).OR.iOrigin.GE.10)then
+			else if((iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax).OR.(bUseMatom.AND.iOrigin.GE.10))then
 				if(rDelay.GT.rPathMax)rPathMax=rDelay/rSecsToDays !DEBUG
 				if(iOrigin.GE.10)iPhotMatom=iPhotMatom+1
 
