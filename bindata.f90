@@ -5,11 +5,11 @@ program main
 	integer, parameter 				:: iKindDP=selected_real_kind(15,300)
 	real(iKindDP), parameter 		:: rcPi = DACOS(-1.D0), rSecsToDays=86400.0
 
-	logical				:: bFound, bMessy=.FALSE., bNoKey=.FALSE., bNoTicks=.FALSE., bUseMatom=.FALSE.
+	logical				:: bFound, bMessy=.FALSE., bNoKey=.FALSE., bNoTicks=.FALSE.
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
 	integer				:: iDimX=100, iDimY=100, iDimR=100
 	integer				:: i,j,iErr=0, iEOF=0, iDummy, iBinX, iBinY, iBinR, iPhot=0,iPhotR=0, iPhotRE=0,iExtracted
-	integer				:: iNScat, iNRScat, iNScatMin=1, iNScatMax=999, iScat, iArg=1,iLine=0, iOrigin, iPhotMatom=0
+	integer				:: iNScat, iNRScat, iNScatMin=1, iNScatMax=999, iScat, iArg=1,iLine=0, iOrigin
 	integer 			:: iObserver, iObserverMin=0, iObserverMax=0, iObservers=1, iObs
 	integer, allocatable			:: aiMap(:,:,:),aiMapX(:,:),aiMapY(:,:),aiMapR(:)
 	real(iKindDP), allocatable		:: arMap(:,:,:),arMapX(:,:),arMapY(:,:),arBinX(:),arBinY(:)
@@ -23,6 +23,10 @@ program main
 	integer				:: iReweightGeom
 	real(iKindDP)		:: rReweightPow, rReweightBase
 	real(iKindDP), allocatable	:: arMapR(:),arBinR(:),arPosR(:),arReweightMult(:)
+
+	logical 			:: bLineMode=.FALSE., bLineFound=.FALSE.
+	integer				:: iLines, iLine_iter, iNRes
+	integer, allocatable 		:: aiLine(:)
 
 	integer				:: iErrWeight=0, iErrMalf=0, iErrLog=0
 	real(iKindDP)		:: rPathMax=0;
@@ -55,6 +59,9 @@ program main
 		print *,"	-v VAL VAL"
 		print *,"Wavelength range to bin. Default is to use spectrum_wavemin-max from input file."
 		print *,""
+		print *,"	-l VAL [VAL] [VAL] [...]"
+		print *,"Macro-atom lines to plot. May be arbitrarily long."
+		print *,""
 		print *,"	-rwp VAL"
 		print *,"Reweight mode: take data and reweight to r^VAL power law surface brightness."
 		print *,""
@@ -75,9 +82,6 @@ program main
 		print *,""
 		print *,"	-m"
 		print *,"Messy, do not delete intermediate files."
-		print *,""		
-		print *,"	-matom"
-		print *,"Matom mode: Use all matom photons."
 		print *,""		
 		print *,"	-nk"
 		print *,"No key, remove colour key from plots."
@@ -173,6 +177,31 @@ program main
 			endif
 			iArg=iArg+3
 
+		else if(cArg.EQ."-l".OR.cArg.EQ."-L")then
+			iLine_iter=iArg+1
+			iLines=0
+			do while(iLine_iter.LE.command_argument_count())
+				call get_command_argument(iLine_iter, cArg)
+				read(cArg,*,iostat=iErr)iLine
+				if(iErr.EQ.0 .AND.iLine.GE.0) then
+					iLines = iLines +1
+				else
+					EXIT
+				endif
+				iLine_iter = iLine_iter +1
+			end do
+
+			if(iLines.EQ.0)then
+				print *,"ERROR: No valid lines listed!"
+				STOP
+			endif
+			allocate(aiLine(iLines))
+			do iLine_iter=1,iLines
+				call get_command_argument(iArg+iLine_iter, cArg)
+				read(cArg,*,iostat=iErr)aiLine(iLine_iter)
+			end do
+			iArg=iArg+iLines+1
+
 		else if(cArg.EQ."-rwp".OR.cArg.EQ."-RWP")then
 			call get_command_argument(iArg+1, cArg)
 			read(cArg,*,iostat=iErr)rReweightPow
@@ -220,10 +249,6 @@ program main
 			iArg=iArg+1
 			bReweightBinLog=.TRUE.
 
-
-		else if(cArg.EQ."-matom".OR.cArg.EQ."-Matom")then
-			bUseMatom=.TRUE.
-			iArg=iArg+1
 		else if(cArg.EQ."-e".OR.cArg.EQ."-E")then
 			bUseExtracted=.TRUE.
 			iArg=iArg+1
@@ -412,8 +437,17 @@ program main
 		if(cBuffer(1:1).NE."#")then
 			iPhot=iPhot+1
 			read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
-										iNScat, iNRScat, rDelay, iExtracted, iObserver, iOrigin
+										iNScat, iNRScat, rDelay, iExtracted, iObserver, iOrigin, iNRes
+
+			!If we're in all scatters mode, select based on total scatters- not just resonant
 			if(bAllScat)iNRScat=iNScat
+			!If we're in line mode, check to see if this photon's origin line is in the list of tracked lines
+			if(bLineMode)then
+				bLineFound=.FALSE.
+				do iLine_iter=1,iLines
+					if(iNRes.EQ.aiLine(iLine_iter)) bLineFound=.TRUE.
+				enddo
+			endif
 
 			if(iErr.GT.0)then
 				iErr=0
@@ -431,10 +465,10 @@ program main
 				!Do nothing
 			elseif(iObserver.LT.iObserverMin.OR.iObserver.GT.iObserverMax)then
 				!Do nothing
-
-			else if((iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax).OR.(bUseMatom.AND.iOrigin.GE.10))then
+			elseif(bLineMode.AND..NOT.bLineFound)then
+				!Do nothing
+			else if((iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax))then
 				if(rDelay.GT.rPathMax)rPathMax=rDelay/rSecsToDays !DEBUG
-				if(iOrigin.GE.10)iPhotMatom=iPhotMatom+1
 
 				iPhotR= iPhotR+1
 				iPhotRE=iPhotRE+iExtracted
@@ -493,7 +527,6 @@ program main
 
 	print '(X,I0,A,I0,A,I0,A)',iPhotR,"/",iPhot," photons scattered."
 	if(bUseExtracted) print '(X,A,I0,A)', " of which ",iPhotRE," were extracted."
-	if(bUseMatom) print '(X,A,I0,A)', " of which ",iPhotMatom," were from macro-atoms."
 
 	if(iPhotR.EQ.0)then
 		print *,'ERROR: No photons fit scattering parameters'
