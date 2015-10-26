@@ -197,10 +197,13 @@ program main
 				STOP
 			endif
 			allocate(aiLine(iLines))
+			write(*,'(A)',advance='no')'Line mode- tracking line(s):'
 			do iLine_iter=1,iLines
 				call get_command_argument(iArg+iLine_iter, cArg)
 				read(cArg,*,iostat=iErr)aiLine(iLine_iter)
+				write(*,'(X,I0)',advance='no')aiLine(iLine_iter)
 			end do
+			write(*,*)''
 			iArg=iArg+iLines+1
 
 		else if(cArg.EQ."-rwp".OR.cArg.EQ."-RWP")then
