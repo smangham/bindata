@@ -180,6 +180,7 @@ program main
 		else if(cArg.EQ."-l".OR.cArg.EQ."-L")then
 			iLine_iter=iArg+1
 			iLines=0
+			bLineMode=.TRUE.
 			do while(iLine_iter.LE.command_argument_count())
 				call get_command_argument(iLine_iter, cArg)
 				read(cArg,*,iostat=iErr)iLine
