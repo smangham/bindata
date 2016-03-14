@@ -3,13 +3,15 @@ program main
 
 	integer, parameter 				:: iFileIn=100,iFileOut=101
 	integer, parameter 				:: iKindDP=selected_real_kind(15,300)
-	real(iKindDP), parameter 		:: rcPi = DACOS(-1.D0), rSecsToDays=86400.0
+	real(iKindDP), parameter 		:: rcPi = DACOS(-1.D0), rSecsToDays=86400.0, rcC=29979245800.0 !cm/s
 
-	logical				:: bFound, bMessy=.FALSE., bNoKey=.FALSE., bNoTicks=.FALSE.
+	logical				:: bFound, bMessy=.FALSE.
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
 	integer				:: iDimX=100, iDimY=100, iDimR=100
 	integer				:: i,j,iErr=0, iEOF=0, iDummy, iBinX, iBinY, iBinR, iPhot=0,iPhotR=0, iPhotRE=0,iExtracted
-	integer				:: iNScat, iNRScat, iNScatMin=1, iNScatMax=999, iScat, iArg=1,iLine=0, iOrigin
+	integer				:: iNScat, iScat, iArg=1,iLine=0, iOrigin
+	integer 			:: iNRScat, iNRScatMin=1, iNRScatMax=999
+	integer				:: iNCScat, iNCScatMin=0, iNCScatMax=999
 	integer 			:: iObserver, iObserverMin=0, iObserverMax=0, iObservers=1, iObs
 	integer, allocatable			:: aiMap(:,:,:),aiMapX(:,:),aiMapY(:,:),aiMapR(:)
 	real(iKindDP), allocatable		:: arMap(:,:,:),arMapX(:,:),arMapY(:,:),arBinX(:),arBinY(:)
@@ -19,6 +21,11 @@ program main
 	character(len=512) 	:: cFileIn="",cFileOut="", cDummy, cArg, cTicks='"%g"'
 	character(len=512)  :: cBuffer
 
+	!Variables for gnuplot
+	logical 			:: bChangeCB=.FALSE., bNoKey=.FALSE., bNoTicks=.FALSE.
+	real(iKindDP)		:: rMinCB, rMaxCB
+
+	!Reweighting variables
 	logical 			:: bReweight=.FALSE., bReweightBinLog=.FALSE., bReweightBinGeom=.FALSE., bLookupY=.TRUE.
 	integer				:: iReweightGeom
 	real(iKindDP)		:: rReweightPow, rReweightBase
@@ -53,11 +60,17 @@ program main
 		print *,"	-s VAL VAL"
 		print *,"Minimum  & maximum number of scatters. Default is 1-999."
 		print *,""
+		print *,"	-sc VAL VAL"
+		print *,"Minimum  & maximum number of continuum scatters. Default is 0-999."
+		print *,""
 		print *,"	-p VAL VAL"
 		print *,"Minimum & maximum path distances to plot. Default is .9-.3.25x wind radius."
 		print *,""
 		print *,"	-v VAL VAL"
 		print *,"Wavelength range to bin. Default is to use spectrum_wavemin-max from input file."
+		print *,""
+		print *,"	-c VAL VAL"
+		print *,"Intensity range for colour plot. Default is to use gnuplot's automatic mode."
 		print *,""
 		print *,"	-l VAL [VAL] [VAL] [...]"
 		print *,"Macro-atom lines to plot. May be arbitrarily long."
@@ -76,9 +89,6 @@ program main
 		print *,""
 		print *,"	-bg"
 		print *,"Reweight mode: Bin geometrically, default is linear."
-		print *,""
-		print *,"	-a"
-		print *,"All scatters, bin both resonant and non-resonant."
 		print *,""
 		print *,"	-m"
 		print *,"Messy, do not delete intermediate files."
@@ -162,17 +172,48 @@ program main
 			bLookupY=.FALSE.
 			iArg=iArg+3
 
-		else if(cArg.EQ."-s".OR.cArg.EQ."-S")then
+		else if(cArg.EQ."-c".OR.cArg.EQ."-C")then
 			call get_command_argument(iArg+1, cArg)
-			read(cArg,*,iostat=iErr)iNScatMin
-			if(iErr.NE.0 .OR.iNScatMin.LT.0)then
-				print *,"ERROR: Minimum scatters argument '"//trim(cArg)//"' invalid!"
+			read(cArg,*,iostat=iErr)rMinCB
+			if(iErr.NE.0)then
+				print *,"ERROR: Minimum intensity argument '"//trim(cArg)//"' invalid!"
 				STOP
 			endif
 			call get_command_argument(iArg+2, cArg)
-			read(cArg,*,iostat=iErr)iNScatMax
-			if(iErr.NE.0 .OR.iNScatMax.LT.iNScatMin)then
-				print *,"ERROR: Maximum scatters argument '"//trim(cArg)//"' invalid!"
+			read(cArg,*,iostat=iErr)rMaxCB
+			if(iErr.NE.0 .OR. rMaxY.LT.rMinY)then
+				print *,"ERROR: Maximum intensity argument '"//trim(cArg)//"' invalid!"
+				STOP
+			endif
+			bChangeCB=.TRUE.
+			iArg=iArg+3
+
+		else if(cArg.EQ."-s".OR.cArg.EQ."-S")then
+			call get_command_argument(iArg+1, cArg)
+			read(cArg,*,iostat=iErr)iNRScatMin
+			if(iErr.NE.0 .OR.iNRScatMin.LT.0)then
+				print *,"ERROR: Minimum resonant scatters argument '"//trim(cArg)//"' invalid!"
+				STOP
+			endif
+			call get_command_argument(iArg+2, cArg)
+			read(cArg,*,iostat=iErr)iNRScatMax
+			if(iErr.NE.0 .OR.iNRScatMax.LT.iNRScatMin)then
+				print *,"ERROR: Maximum resonant scatters argument '"//trim(cArg)//"' invalid!"
+				STOP
+			endif
+			iArg=iArg+3
+
+		else if(cArg.EQ."-sc".OR.cArg.EQ."-SC")then
+			call get_command_argument(iArg+1, cArg)
+			read(cArg,*,iostat=iErr)iNCScatMin
+			if(iErr.NE.0 .OR.iNCScatMin.LT.0)then
+				print *,"ERROR: Minimum continuum scatters argument '"//trim(cArg)//"' invalid!"
+				STOP
+			endif
+			call get_command_argument(iArg+2, cArg)
+			read(cArg,*,iostat=iErr)iNCScatMax
+			if(iErr.NE.0 .OR.iNCScatMax.LT.iNCScatMin)then
+				print *,"ERROR: Maximum continuum scatters argument '"//trim(cArg)//"' invalid!"
 				STOP
 			endif
 			iArg=iArg+3
@@ -256,9 +297,6 @@ program main
 		else if(cArg.EQ."-e".OR.cArg.EQ."-E")then
 			bUseExtracted=.TRUE.
 			iArg=iArg+1
-		else if(cArg.EQ."-a".OR.cArg.EQ."-A")then
-			bAllScat=.TRUE.
-			iArg=iArg+1
 		else if(cArg.EQ."-m".OR.cArg.EQ."-M")then
 			bMessy=.TRUE.
 			iArg=iArg+1
@@ -304,12 +342,10 @@ program main
 	endif
 	if(bLookupY)then
 		rRad = rfGetKeyword(trim(cFileIn)//".pf","wind.radmax")
-		rMinY= rRad*0.50
-		rMaxY= rRad*4.50
+		rMinY= rRad*0.50/(rSecsToDays*rcC) !Find delay in days from travel time in light-seconds, then seconds->days
+		rMaxY= rRad*4.50/(rSecsToDays*rcC)
 		print '(X,A,ES8.2,A,ES8.2,A,I0,A)','Binning paths from ',rMinY,' to ',rMaxY,'cm in ',iDimY,' steps'
 	endif
-	rMaxY=rMaxY/rSecsToDays
-	rMinY=rMinY/rSecsToDays
 	rRngX=rMaxX-rMinX
 	rRngY=rMaxY-rMinY
 	rRngR=rMaxR-rMinR
@@ -442,9 +478,8 @@ program main
 			iPhot=iPhot+1
 			read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
 										iNScat, iNRScat, rDelay, iExtracted, iObserver, iOrigin, iNRes
+			iNCScat = iNScat - iNRScat
 
-			!If we're in all scatters mode, select based on total scatters- not just resonant
-			if(bAllScat)iNRScat=iNScat
 			!If we're in line mode, check to see if this photon's origin line is in the list of tracked lines
 			if(bLineMode)then
 				bLineFound=.FALSE.
@@ -471,7 +506,11 @@ program main
 				!Do nothing
 			elseif(bLineMode.AND..NOT.bLineFound)then
 				!Do nothing
-			else if((iNRScat.GE.iNScatMin.AND.iNRScat.LE.iNScatMax))then
+			elseif(iNCScat.LE.iNCScatMin.OR.iNCScat.GT.iNCScatMax)then
+				!Do nothing
+			elseif(iNRScat.LE.iNRScatMin.OR.iNRScat.GT.iNRScatMax)then
+				!Do nothing
+			else 
 				if(rDelay.GT.rPathMax)rPathMax=rDelay/rSecsToDays !DEBUG
 
 				iPhotR= iPhotR+1
@@ -614,6 +653,9 @@ program main
 		write(iFileOut,'(A)')'unset ylabel'
 		write(iFileOut,'(A)')'set tics front'
 		write(iFileOut,'(A)')'set palette rgb -34,-35,-36'
+		if(bChangeCB)then
+			write(iFileOut,'(A)')'set cbrange ['//trim(r2c(rMinCB))//':'//trim(r2c(rMaxCB))//']'
+		endif
 		write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3 w ima notitle'
 
 		write(iFileOut,'(A)')'set origin 0.6,0.4'
