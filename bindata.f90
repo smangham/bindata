@@ -31,12 +31,13 @@ program main
 	real(iKindDP)		:: rReweightPow, rReweightBase
 	real(iKindDP), allocatable	:: arMapR(:),arBinR(:),arPosR(:),arReweightMult(:)
 
+	!Line mode variables
 	logical 			:: bLineMode=.FALSE., bLineFound=.FALSE.
 	integer				:: iLines, iLine_iter, iNRes
 	integer, allocatable 		:: aiLine(:)
 
+	!Error tracking variables
 	integer				:: iErrWeight=0, iErrMalf=0, iErrLog=0
-	real(iKindDP)		:: rPathMax=0;
 
 	if(command_argument_count().EQ.0)then
 		print *,"DESCRIPTION:"
@@ -506,12 +507,11 @@ program main
 				!Do nothing
 			elseif(bLineMode.AND..NOT.bLineFound)then
 				!Do nothing
-			elseif(iNCScat.LE.iNCScatMin.OR.iNCScat.GT.iNCScatMax)then
+			elseif(iNCScat.LT.iNCScatMin.OR.iNCScat.GT.iNCScatMax)then
 				!Do nothing
-			elseif(iNRScat.LE.iNRScatMin.OR.iNRScat.GT.iNRScatMax)then
+			elseif(iNRScat.LT.iNRScatMin.OR.iNRScat.GT.iNRScatMax)then
 				!Do nothing
 			else 
-				if(rDelay.GT.rPathMax)rPathMax=rDelay/rSecsToDays !DEBUG
 
 				iPhotR= iPhotR+1
 				iPhotRE=iPhotRE+iExtracted
@@ -521,10 +521,10 @@ program main
 					iErrLog=iErrLog+1
 					if(iErrLog.LT.10) then
 						print '(X,A,ES10.4,A,ES10.4,A,I0)','WARNING: Point at frequency ',rLambda,&
-								', path ',rDelay,' lies outside range #',iErrLog
+								', path ',rDelay/rSecsToDays,' lies outside range #',iErrLog
 					elseif(iErrLog.EQ.10)then
 						print '(X,A,ES10.4,A,ES10.4,A,I0,A)','WARNING: Point at frequency ',rLambda,&
-								', path ',rDelay,' lies outside range #',iErrLog,". Suppressing further warnings."
+								', path ',rDelay/rSecsToDays,' lies outside range #',iErrLog,". Suppressing further warnings."
 					endif
 				else
 					!If using surface brightness correction, then adjust
@@ -561,8 +561,6 @@ program main
 			endif
 		endif
 	end do
-	!print '(1X,A,ES9.3,X,ES9.3)','Maximum path traveled [raw/radii]: ',rPathMax,rPathMax/rMaxR
-
 	close(iFileIn)
 
 	if(iErrLog.GT.0) print '(X,A,I0,A)',"WARNING: ",iErrLog," points lay outside the map range."
