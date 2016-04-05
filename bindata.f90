@@ -8,10 +8,8 @@ program main
 	logical				:: bFound, bMessy=.FALSE.
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
 	integer				:: iDimX=100, iDimY=100, iDimR=100
-	integer				:: i,j,iErr=0, iEOF=0, iDummy, iBinX, iBinY, iBinR, iPhot=0,iPhotR=0, iPhotRE=0,iExtracted
-	integer				:: iNScat, iScat, iArg=1,iLine=0, iOrigin
-	integer 			:: iNRScat, iNRScatMin=1, iNRScatMax=999
-	integer				:: iNCScat, iNCScatMin=0, iNCScatMax=999
+	integer				:: i,j,k,iErr=0, iEOF=0, iDummy, iBinX, iBinY, iBinR, iPhot=0,iPhotR=0, iPhotRE=0,iExtracted
+	integer				:: iArg=1
 	integer 			:: iObserver, iObserverMin=0, iObserverMax=0, iObservers=1, iObs
 	integer, allocatable			:: aiMap(:,:,:),aiMapX(:,:),aiMapY(:,:),aiMapR(:)
 	real(iKindDP), allocatable		:: arMap(:,:,:),arMapX(:,:),arMapY(:,:),arBinX(:),arBinY(:)
@@ -20,6 +18,13 @@ program main
 	real(iKindDP)		:: rMinP=1e300_iKindDP, rMaxP=0.,rMinI=1e300_iKindDP,rMaxI=0.,rRad=-1, rTemp=0.0
 	character(len=512) 	:: cFileIn="",cFileOut="", cDummy, cArg, cTicks='"%g"'
 	character(len=512)  :: cBuffer
+
+	!Variables for reading in dump file
+	integer				:: iNScat, iLine=0, iOrigin
+
+	!Variables for scatter selection
+	integer 			:: iNRScat, iNRScatMin=1, iNRScatMax=999
+	integer				:: iNCScat, iNCScatMin=0, iNCScatMax=999
 
 	!Variables for gnuplot
 	logical 			:: bChangeCB=.FALSE., bNoKey=.FALSE., bNoTicks=.FALSE.
@@ -38,6 +43,10 @@ program main
 
 	!Error tracking variables
 	integer				:: iErrWeight=0, iErrMalf=0, iErrLog=0
+
+	!Pointwise mode variables
+	logical 			:: bPointwise=.FALSE.
+	real(iKindDP)		:: rPathPeak, rPathFWHMlower, rPathFWHMupper, rPeakFlux
 
 	if(command_argument_count().EQ.0)then
 		print *,"DESCRIPTION:"
@@ -105,6 +114,9 @@ program main
 		print *,""
 		print *,"	-e"
 		print *,"Extract mode, use only extracted photons."
+		print *,""
+		print *,"	-x"
+		print *,"Pointwise mode."
 		STOP
 	endif
 
@@ -310,6 +322,9 @@ program main
 		else if(cArg.EQ."-nt".OR.cArg.EQ."-NT")then
 			bNoTicks=.TRUE.
 			cTicks='" "'
+			iArg=iArg+1
+		else if(cArg.EQ."-x".OR.cArg.EQ."-X")then
+			bPointwise=.TRUE.
 			iArg=iArg+1
 
 		else if(cArg.EQ."-i".OR.cArg.EQ."-I")then
@@ -581,21 +596,55 @@ program main
 			print '(A)','Writing to "'//trim(cFileOut)//'.eps"'
 		endif
 
-		open(iFileOut,file=trim(cFileOut)//".bin_XY",status="REPLACE",action="WRITE")
-		do j=1,iDimY
-			rPosY = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
+		if(.NOT.bPointwise)then
+			open(iFileOut,file=trim(cFileOut)//".bin_XY",status="REPLACE",action="WRITE")
+			do j=1,iDimY
+				rPosY = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
+				do i=1,iDimX
+					rPosX = rMinX+(i-.5)*(rMaxX-rMinX)/real(iDimX)
+					if(aiMap(i,j,iObs).GT.0 .AND. arMap(i,j,iObs).GT.0) then 
+						rErr = sqrt(REAL(aiMap(i,j,iObs)))/aiMap(i,j,iObs)
+						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosY, arMap(i,j,iObs), rErr
+					else
+						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosY, 0.0, 1.0
+					endif
+				end do
+			end do
+			close(iFileOut)
+		else
+			open(iFileOut,file=trim(cFileOut)//".bin_XY",status="REPLACE",action="WRITE")
 			do i=1,iDimX
 				rPosX = rMinX+(i-.5)*(rMaxX-rMinX)/real(iDimX)
-				if(aiMap(i,j,iObs).GT.0 .AND. arMap(i,j,iObs).GT.0) then 
-					rErr = sqrt(REAL(aiMap(i,j,iObs)))/aiMap(i,j,iObs)
-					write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosY, arMap(i,j,iObs), rErr
-				else
-					write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosY, 0.0, 1.0
+				rPeakFlux = 0
+
+				do j=1,iDimY
+					if(arMap(i,j,iObs).GT.rPeakFlux) then
+						rPeakFlux = arMap(i,j,iObs)
+						rPathPeak = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
+					endif
+				enddo
+
+				rPathFWHMlower = 0.0
+				rPathFWHMupper = 0.0
+				do j=1,iDimY
+					if(rPathFWHMlower.EQ.0.0)then
+						if(arMap(i,j,iObs).GE.rPeakFlux/2.0) then
+							rPathFWHMlower = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
+						endif
+					elseif(rPathFWHMupper.EQ.0.0)then
+						if(arMap(i,j,iObs).LE.rPeakFlux/2.0) then
+							rPathFWHMupper = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
+						endif
+					endif
+				enddo
+
+				if(rPeakFlux.GT.0.0)then
+					write(iFileOut,'(4(ES12.5,1X))') rPosX, rPathPeak, rPathFWHMlower, rPathFWHMupper
 				endif
 			end do
-		end do
-		close(iFileOut)
-
+			close(iFileOut)
+		endif
+	
 		open(iFileOut,file=trim(cFileOut)//".bin_X",status="REPLACE",action="WRITE")
 		do i=1,iDimX
 			rPosX = rMinX+(i-.5)*(rMaxX-rMinX)/real(iDimX)
@@ -632,7 +681,7 @@ program main
 		if(.NOT.bNoLog) write(iFileOut,'(A)')'set log cb'
 		write(iFileOut,'(A)')'set colorbox user origin 0.65,0.05 size .05,0.3'
 		write(iFileOut,'(A)')'set cblabel "Flux (erg s^{-1} cm^{2})"'
-		if(bNoKey)then
+		if(bNoKey.OR.bPointwise)then
 			write(iFileOut,'(A)')'unset colorbox'		
 		endif
 
@@ -654,7 +703,11 @@ program main
 		if(bChangeCB)then
 			write(iFileOut,'(A)')'set cbrange ['//trim(r2c(rMinCB))//':'//trim(r2c(rMaxCB))//']'
 		endif
-		write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3 w ima notitle'
+		if(bPointwise)then
+			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3:4 w yerrors notitle'
+		else
+			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3 w ima notitle'
+		endif
 
 		write(iFileOut,'(A)')'set origin 0.6,0.4'
 		write(iFileOut,'(A)')'set size 0.15,0.5'
