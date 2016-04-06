@@ -20,7 +20,7 @@ program main
 	character(len=512)  :: cBuffer
 
 	!Variables for reading in dump file
-	integer				:: iNScat, iLine=0, iOrigin
+	integer				:: iNScat, iLine=0
 
 	!Variables for scatter selection
 	integer 			:: iNRScat, iNRScatMin=1, iNRScatMax=999
@@ -51,7 +51,7 @@ program main
 
 	!Variables for specifying origin
 	logical 			:: bOriginMode=.FALSE., bOriginFound=.FALSE.
-	integer				:: iOrigins=0
+	integer				:: iOrigins=0, iOrigin
 	integer, allocatable		:: aiOrigin(:)
 
 	if(command_argument_count().EQ.0)then
@@ -284,7 +284,7 @@ program main
 				iArg_iter = iArg_iter +1
 			end do
 
-			if(iLines.EQ.0)then
+			if(iOrigins.EQ.0)then
 				print *,"ERROR: No valid origins listed!"
 				STOP
 			endif
@@ -296,7 +296,7 @@ program main
 				write(*,'(X,I0)',advance='no')aiOrigin(iArg_iter)
 			end do
 			write(*,*)''
-			iArg=iArg+iLines+1			
+			iArg=iArg+iOrigins+1			
 
 		else if(cArg.EQ."-rwp".OR.cArg.EQ."-RWP")then
 			call get_command_argument(iArg+1, cArg)
