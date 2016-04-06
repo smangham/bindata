@@ -9,7 +9,7 @@ program main
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
 	integer				:: iDimX=100, iDimY=100, iDimR=100
 	integer				:: i,j,k,iErr=0, iEOF=0, iDummy, iBinX, iBinY, iBinR, iPhot=0,iPhotR=0, iPhotRE=0,iExtracted
-	integer				:: iArg=1
+	integer				:: iArg=1, iArg_iter
 	integer 			:: iObserver, iObserverMin=0, iObserverMax=0, iObservers=1, iObs
 	integer, allocatable			:: aiMap(:,:,:),aiMapX(:,:),aiMapY(:,:),aiMapR(:)
 	real(iKindDP), allocatable		:: arMap(:,:,:),arMapX(:,:),arMapY(:,:),arBinX(:),arBinY(:)
@@ -38,7 +38,7 @@ program main
 
 	!Line mode variables
 	logical 			:: bLineMode=.FALSE., bLineFound=.FALSE.
-	integer				:: iLines, iLine_iter, iNRes
+	integer				:: iLines=0, iNRes
 	integer, allocatable 		:: aiLine(:)
 
 	!Error tracking variables
@@ -47,6 +47,12 @@ program main
 	!Pointwise mode variables
 	logical 			:: bPointwise=.FALSE.
 	real(iKindDP)		:: rPathPeak, rPathFWHMlower, rPathFWHMupper, rPeakFlux
+	integer 			:: iPathPeak
+
+	!Variables for specifying origin
+	logical 			:: bOriginMode=.FALSE., bOriginFound=.FALSE.
+	integer				:: iOrigins=0
+	integer, allocatable		:: aiOrigin(:)
 
 	if(command_argument_count().EQ.0)then
 		print *,"DESCRIPTION:"
@@ -84,6 +90,9 @@ program main
 		print *,""
 		print *,"	-l VAL [VAL] [VAL] [...]"
 		print *,"Macro-atom lines to plot. May be arbitrarily long."
+		print *,""
+		print *,"	-or VAL [VAL] [VAL] [...]"
+		print *,"Origins to plot. May be arbitrarily long."		
 		print *,""
 		print *,"	-rwp VAL"
 		print *,"Reweight mode: take data and reweight to r^VAL power law surface brightness."
@@ -232,18 +241,18 @@ program main
 			iArg=iArg+3
 
 		else if(cArg.EQ."-l".OR.cArg.EQ."-L")then
-			iLine_iter=iArg+1
+			iArg_iter=iArg+1
 			iLines=0
 			bLineMode=.TRUE.
-			do while(iLine_iter.LE.command_argument_count())
-				call get_command_argument(iLine_iter, cArg)
+			do while(iArg_iter.LE.command_argument_count())
+				call get_command_argument(iArg_iter, cArg)
 				read(cArg,*,iostat=iErr)iLine
 				if(iErr.EQ.0 .AND.iLine.GE.0) then
 					iLines = iLines +1
 				else
 					EXIT
 				endif
-				iLine_iter = iLine_iter +1
+				iArg_iter = iArg_iter +1
 			end do
 
 			if(iLines.EQ.0)then
@@ -252,13 +261,42 @@ program main
 			endif
 			allocate(aiLine(iLines))
 			write(*,'(A)',advance='no')'Line mode- tracking line(s):'
-			do iLine_iter=1,iLines
-				call get_command_argument(iArg+iLine_iter, cArg)
-				read(cArg,*,iostat=iErr)aiLine(iLine_iter)
-				write(*,'(X,I0)',advance='no')aiLine(iLine_iter)
+			do iArg_iter=1,iLines
+				call get_command_argument(iArg+iArg_iter, cArg)
+				read(cArg,*,iostat=iErr)aiLine(iArg_iter)
+				write(*,'(X,I0)',advance='no')aiLine(iArg_iter)
 			end do
 			write(*,*)''
 			iArg=iArg+iLines+1
+
+		else if(cArg.EQ."-or".OR.cArg.EQ."-OR")then
+			iArg_iter=iArg+1
+			iOrigins=0
+			bOriginMode=.TRUE.
+			do while(iArg_iter.LE.command_argument_count())
+				call get_command_argument(iArg_iter, cArg)
+				read(cArg,*,iostat=iErr)iOrigin
+				if(iErr.EQ.0 .AND.iOrigin.GE.-1) then
+					iOrigins = iOrigins +1
+				else
+					EXIT
+				endif
+				iArg_iter = iArg_iter +1
+			end do
+
+			if(iLines.EQ.0)then
+				print *,"ERROR: No valid origins listed!"
+				STOP
+			endif
+			allocate(aiOrigin(iOrigins))
+			write(*,'(A)',advance='no')'Origin mode- tracking origin(s):'
+			do iArg_iter=1,iOrigins
+				call get_command_argument(iArg+iArg_iter, cArg)
+				read(cArg,*,iostat=iErr)aiOrigin(iArg_iter)
+				write(*,'(X,I0)',advance='no')aiOrigin(iArg_iter)
+			end do
+			write(*,*)''
+			iArg=iArg+iLines+1			
 
 		else if(cArg.EQ."-rwp".OR.cArg.EQ."-RWP")then
 			call get_command_argument(iArg+1, cArg)
@@ -366,12 +404,16 @@ program main
 	rRngY=rMaxY-rMinY
 	rRngR=rMaxR-rMinR
 
+	if(bPointwise)then
+		print '(A)','Plotting pointwise mode'
+	endif
 	iObservers = 1 +(iObserverMax - iObserverMin)
 	if(iObservers > 1)then
 		print '(A,I0,A,I0)','Plotting observers ',iObserverMin,' to ',iObserverMax
 	else
-		print '(A,I0)','Plotting observer',iObserverMin
+		print '(A,I0)','Plotting observer ',iObserverMin
 	endif
+
 
 
 	allocate(aiMapX(iDimX,iObservers), aiMapY(iDimY,iObservers), aiMapR(iDimR), aiMap(iDimX,iDimY,iObservers))
@@ -499,8 +541,15 @@ program main
 			!If we're in line mode, check to see if this photon's origin line is in the list of tracked lines
 			if(bLineMode)then
 				bLineFound=.FALSE.
-				do iLine_iter=1,iLines
-					if(iNRes.EQ.aiLine(iLine_iter)) bLineFound=.TRUE.
+				do i=1,iLines
+					if(iNRes.EQ.aiLine(i)) bLineFound=.TRUE.
+				enddo
+			endif
+			!If we're in origin mode, check to see if this photon's origin is in the list of tracked origins
+			if(bOriginMode)then
+				bOriginFound=.FALSE.
+				do i=1,iOrigins
+					if(iOrigin.EQ.aiOrigin(i)) bLineFound=.TRUE.
 				enddo
 			endif
 
@@ -521,6 +570,8 @@ program main
 			elseif(iObserver.LT.iObserverMin.OR.iObserver.GT.iObserverMax)then
 				!Do nothing
 			elseif(bLineMode.AND..NOT.bLineFound)then
+				!Do nothing
+			elseif(bOriginMode.AND..NOT.bOriginFound)then
 				!Do nothing
 			elseif(iNCScat.LT.iNCScatMin.OR.iNCScat.GT.iNCScatMax)then
 				!Do nothing
@@ -615,26 +666,25 @@ program main
 			open(iFileOut,file=trim(cFileOut)//".bin_XY",status="REPLACE",action="WRITE")
 			do i=1,iDimX
 				rPosX = rMinX+(i-.5)*(rMaxX-rMinX)/real(iDimX)
-				rPeakFlux = 0
+				rPeakFlux = 0.0
 
 				do j=1,iDimY
 					if(arMap(i,j,iObs).GT.rPeakFlux) then
 						rPeakFlux = arMap(i,j,iObs)
-						rPathPeak = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
+						rPathPeak = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
+						iPathPeak = j
 					endif
 				enddo
 
-				rPathFWHMlower = 0.0
-				rPathFWHMupper = 0.0
-				do j=1,iDimY
-					if(rPathFWHMlower.EQ.0.0)then
-						if(arMap(i,j,iObs).GE.rPeakFlux/2.0) then
-							rPathFWHMlower = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
-						endif
-					elseif(rPathFWHMupper.EQ.0.0)then
-						if(arMap(i,j,iObs).LE.rPeakFlux/2.0) then
-							rPathFWHMupper = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
-						endif
+				do j=iPathPeak,1,-1	
+					if(arMap(i,j,iObs).GE.rPeakFlux/2.0)then
+						rPathFWHMlower = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
+					endif
+				enddo
+
+				do j=iPathPeak,iDimY					
+					if(arMap(i,j,iObs).LE.rPeakFlux/2.0)then
+						rPathFWHMupper = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
 					endif
 				enddo
 
@@ -678,7 +728,9 @@ program main
 		endif
 		write(iFileOut,'(A)')'set multiplot'
 		write(iFileOut,'(A)')'set bmargin 0; set tmargin 0; set lmargin 0; set rmargin 0'
-		if(.NOT.bNoLog) write(iFileOut,'(A)')'set log cb'
+		if(.NOT.bNoLog.AND..NOT.bPointwise)then
+			write(iFileOut,'(A)')'set log cb'
+		endif
 		write(iFileOut,'(A)')'set colorbox user origin 0.65,0.05 size .05,0.3'
 		write(iFileOut,'(A)')'set cblabel "Flux (erg s^{-1} cm^{2})"'
 		if(bNoKey.OR.bPointwise)then
@@ -704,7 +756,7 @@ program main
 			write(iFileOut,'(A)')'set cbrange ['//trim(r2c(rMinCB))//':'//trim(r2c(rMaxCB))//']'
 		endif
 		if(bPointwise)then
-			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3:4 w yerrors notitle'
+			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3:4 w errorbars notitle'
 		else
 			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3 w ima notitle'
 		endif
