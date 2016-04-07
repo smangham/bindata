@@ -45,8 +45,8 @@ program main
 	integer				:: iErrWeight=0, iErrMalf=0, iErrLog=0
 
 	!Pointwise mode variables
-	logical 			:: bPointwise=.FALSE.
-	real(iKindDP)		:: rPathPeak, rPathFWHMlower, rPathFWHMupper, rPeakFlux
+	logical 			:: bPointwise=.FALSE., bPointwiceCent=.FALSE.
+	real(iKindDP)		:: rPathPeak, rPathFWHMlower, rPathFWHMupper, rPeakFlux, rPathCent, rFluxCent
 	integer 			:: iPathPeak
 
 	!Variables for specifying origin
@@ -125,7 +125,10 @@ program main
 		print *,"Extract mode, use only extracted photons."
 		print *,""
 		print *,"	-x"
-		print *,"Pointwise mode."
+		print *,"Pointwise mode (peak)."
+		print *,""
+		print *,"	-xc"
+		print *,"Pointwise mode (centroid)."
 		STOP
 	endif
 
@@ -363,6 +366,10 @@ program main
 			iArg=iArg+1
 		else if(cArg.EQ."-x".OR.cArg.EQ."-X")then
 			bPointwise=.TRUE.
+			iArg=iArg+1
+		else if(cArg.EQ."-xc".OR.cArg.EQ."-XC")then
+			bPointwise=.TRUE.
+			bPointwiceCent=.TRUE.
 			iArg=iArg+1
 
 		else if(cArg.EQ."-i".OR.cArg.EQ."-I")then
@@ -676,6 +683,20 @@ program main
 					endif
 				enddo
 
+				if(bPointwiceCent)then
+					rPathCent = 0.0
+					rFluxCent = 0.0
+
+					do j=1,iDimY
+						rPosY = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
+						if(rPosY .GE. 0.8*rPathPeak) then
+							rPathCent = rPathCent + arMap(i,j,iObs) * rPosY
+							rFluxCent = rFluxCent + arMap(i,j,iObs)
+						endif
+					enddo
+					rPathCent = rPathCent / rFluxCent
+				endif
+
 				if(rPeakFlux.GT.0)then
 					do j=iPathPeak,1,-1	
 						if(arMap(i,j,iObs).GE.rPeakFlux/2.0)then
@@ -689,7 +710,11 @@ program main
 						endif
 					enddo
 
-					write(iFileOut,'(4(ES12.5,1X))') rPosX, rPathPeak, rPathFWHMlower, rPathFWHMupper
+					if(bPointwiceCent)then
+						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPathCent, rPathFWHMlower, rPathFWHMupper
+					else
+						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPathPeak, rPathFWHMlower, rPathFWHMupper
+					endif
 				endif
 			end do
 			close(iFileOut)
