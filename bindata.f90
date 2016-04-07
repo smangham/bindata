@@ -46,8 +46,9 @@ program main
 
 	!Pointwise mode variables
 	logical 			:: bPointwise=.FALSE., bPointwiceCent=.FALSE.
-	real(iKindDP)		:: rPathPeak, rPathFWHMlower, rPathFWHMupper, rPeakFlux, rPathCent, rFluxCent
+	real(iKindDP)		:: rPathPeak, rPathFWHMlower, rPathFWHMupper, rPeakFlux, rPathCent, rFluxCent, rPathCentU, rPathCentL,rFluxTemp
 	integer 			:: iPathPeak
+	real(iKindDP)		:: rPosXL, rPosXU
 
 	!Variables for specifying origin
 	logical 			:: bOriginMode=.FALSE., bOriginFound=.FALSE.
@@ -672,7 +673,9 @@ program main
 		else
 			open(iFileOut,file=trim(cFileOut)//".bin_XY",status="REPLACE",action="WRITE")
 			do i=1,iDimX
-				rPosX = rMinX+(i-.5)*(rMaxX-rMinX)/real(iDimX)
+				rPosX  = rMinX+(i-0.5)*(rMaxX-rMinX)/real(iDimX)
+				rPosXL = rMinX+(i-1.0)*(rMaxX-rMinX)/real(iDimX)
+				rPosXU = rMinX+(i-0.0)*(rMaxX-rMinX)/real(iDimX)
 				rPeakFlux = 0.0
 
 				do j=1,iDimY
@@ -694,26 +697,42 @@ program main
 							rFluxCent = rFluxCent + arMap(i,j,iObs)
 						endif
 					enddo
-					rPathCent = rPathCent / rFluxCent
-				endif
+					if(rFluxCent.GT.0.0)then
+						rPathCent = rPathCent / rFluxCent
+						rFluxTemp = 0.0
+						rPathCentL = 0.0
+						rPathCentU = 0.0
 
-				if(rPeakFlux.GT.0)then
-					do j=iPathPeak,1,-1	
-						if(arMap(i,j,iObs).GE.rPeakFlux/2.0)then
-							rPathFWHMlower = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
-						endif
-					enddo
+						do j=1,iDimY
+							rPosY = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
+							if(rPosY .GE. 0.8*rPathPeak) then
+								rFluxTemp = rFLuxTemp + arMap(i,j,iObs)
+								if(rFluxTemp/rFluxCent.LE.0.15865)then
+									rPathCentL = rPosY
+								elseif(rFluxTemp/rFluxCent.LE.0.84135)then
+									rPathCentU = rPosY
+								endif
+							endif
 
-					do j=iPathPeak,iDimY					
-						if(arMap(i,j,iObs).GE.rPeakFlux/2.0)then
-							rPathFWHMupper = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
-						endif
-					enddo
+						enddo
+						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosXL, rPosXU, rPathCent, rPathCentL, rPathCentU
+					endif
+				else
 
-					if(bPointwiceCent)then
-						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPathCent, rPathFWHMlower, rPathFWHMupper
-					else
-						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPathPeak, rPathFWHMlower, rPathFWHMupper
+					if(rPeakFlux.GT.0.0)then
+						do j=iPathPeak,1,-1	
+							if(arMap(i,j,iObs).GE.rPeakFlux/2.0)then
+								rPathFWHMlower = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
+							endif
+						enddo
+
+						do j=iPathPeak,iDimY					
+							if(arMap(i,j,iObs).GE.rPeakFlux/2.0)then
+								rPathFWHMupper = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
+							endif
+						enddo
+						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosXL, rPosXU, rPathPeak, rPathFWHMlower, rPathFWHMupper
+						
 					endif
 				endif
 			end do
@@ -781,7 +800,7 @@ program main
 			write(iFileOut,'(A)')'set cbrange ['//trim(r2c(rMinCB))//':'//trim(r2c(rMaxCB))//']'
 		endif
 		if(bPointwise)then
-			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3:4 w errorbars notitle'
+			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3:4 w xyerrorbars notitle'
 		else
 			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3 w ima notitle'
 		endif
