@@ -684,14 +684,12 @@ program main
 					enddo
 
 					do j=iPathPeak,iDimY					
-						if(arMap(i,j,iObs).LE.rPeakFlux/2.0)then
+						if(arMap(i,j,iObs).GE.rPeakFlux/2.0)then
 							rPathFWHMupper = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
 						endif
 					enddo
 
-					if(rPeakFlux.GT.0.0)then
-						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPathPeak, rPathFWHMlower, rPathFWHMupper
-					endif
+					write(iFileOut,'(4(ES12.5,1X))') rPosX, rPathPeak, rPathFWHMlower, rPathFWHMupper
 				endif
 			end do
 			close(iFileOut)
