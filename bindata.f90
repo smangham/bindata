@@ -715,7 +715,7 @@ program main
 							endif
 
 						enddo
-						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosXL, rPosXU, rPathCent, rPathCentL, rPathCentU
+						write(iFileOut,'(6(ES12.5,1X))') rPosX, rPosXL, rPosXU, rPathCent, rPathCentL, rPathCentU
 					endif
 				else
 
@@ -731,7 +731,7 @@ program main
 								rPathFWHMupper = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
 							endif
 						enddo
-						write(iFileOut,'(4(ES12.5,1X))') rPosX, rPosXL, rPosXU, rPathPeak, rPathFWHMlower, rPathFWHMupper
+						write(iFileOut,'(6(ES12.5,1X))') rPosX, rPosXL, rPosXU, rPathPeak, rPathFWHMlower, rPathFWHMupper
 						
 					endif
 				endif
@@ -800,7 +800,7 @@ program main
 			write(iFileOut,'(A)')'set cbrange ['//trim(r2c(rMinCB))//':'//trim(r2c(rMaxCB))//']'
 		endif
 		if(bPointwise)then
-			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3:4 w xyerrorbars notitle'
+			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:4:2:3:5:6 w xyerrorbars notitle'
 		else
 			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3 w ima notitle'
 		endif
