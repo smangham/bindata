@@ -93,7 +93,7 @@ program main
 		print *,"Macro-atom lines to plot. May be arbitrarily long."
 		print *,""
 		print *,"	-or VAL [VAL] [VAL] [...]"
-		print *,"Origins to plot. May be arbitrarily long."		
+		print *,"Origins to plot. May be arbitrarily long. Disk = 2, Wind = 3, AGN = 4."		
 		print *,""
 		print *,"	-rwp VAL"
 		print *,"Reweight mode: take data and reweight to r^VAL power law surface brightness."
@@ -557,7 +557,7 @@ program main
 			if(bOriginMode)then
 				bOriginFound=.FALSE.
 				do i=1,iOrigins
-					if(iOrigin.EQ.aiOrigin(i)) bLineFound=.TRUE.
+					if(iOrigin.EQ.aiOrigin(i)) bOriginFound=.TRUE.
 				enddo
 			endif
 
