@@ -776,7 +776,7 @@ program main
 			write(iFileOut,'(A)')'set log cb'
 		endif
 		write(iFileOut,'(A)')'set colorbox user origin 0.65,0.05 size .05,0.3'
-		write(iFileOut,'(A)')'set cblabel "Flux (erg s^{-1} cm^{2})"'
+		write(iFileOut,'(A)')'set cblabel "Luminosity (erg s^{-1})"'
 		if(bNoKey.OR.bPointwise)then
 			write(iFileOut,'(A)')'unset colorbox'		
 		endif
