@@ -1,9 +1,11 @@
 program main
 	IMPLICIT NONE
 
-	integer, parameter 				:: iFileIn=100,iFileOut=101
-	integer, parameter 				:: iKindDP=selected_real_kind(15,300)
-	real(iKindDP), parameter 		:: rcPi = DACOS(-1.D0), rSecsToDays=86400.0, rcC=29979245800.0 !cm/s
+	integer, parameter 			:: iFileIn=100,iFileOut=101
+	integer, parameter 			:: iKindDP=selected_real_kind(15,300)
+	real(iKindDP), parameter 	:: rcPi = DACOS(-1.D0), rSecsToDays=86400.0, rcC=29979245800.0 !cm/s
+	real(iKindDP), parameter 	:: rcG = 6.67408e-8 !cgs
+	real(iKindDP), parameter 	:: rcMSol = 1.98855e33 !g
 
 	logical				:: bFound, bMessy=.FALSE.
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
@@ -37,15 +39,16 @@ program main
 	real(iKindDP), allocatable	:: arMapR(:),arBinR(:),arPosR(:),arReweightMult(:)
 
 	!Line mode variables
-	logical 			:: bLineMode=.FALSE., bLineFound=.FALSE.
+	logical 			:: bLineMode=.FALSE., bLineFound=.FALSE., bLineBHEstimate=.FALSE.
 	integer				:: iLines=0, iNRes
 	integer, allocatable 		:: aiLine(:)
+	real(iKindDP)		:: rLineLambda
 
 	!Error tracking variables
 	integer				:: iErrWeight=0, iErrMalf=0, iErrLog=0
 
 	!Pointwise mode variables
-	logical 			:: bPointwise=.FALSE., bPointwiceCent=.FALSE.
+	logical 			:: bPointwise=.FALSE.,bPointwiseOnly=.FALSE.
 	real(iKindDP)		:: rPathPeak, rPathFWHMlower, rPathFWHMupper, rPeakFlux, rPathCent, rFluxCent, rPathCentU, rPathCentL,rFluxTemp
 	integer 			:: iPathPeak
 	real(iKindDP)		:: rPosXL, rPosXU
@@ -54,6 +57,9 @@ program main
 	logical 			:: bOriginMode=.FALSE., bOriginFound=.FALSE.
 	integer				:: iOrigins=0, iOrigin
 	integer, allocatable		:: aiOrigin(:)
+
+	!Centroid delay variables
+	real(iKindDP)		:: rDelayCent, rDelayL, rDelayU
 
 	if(command_argument_count().EQ.0)then
 		print *,"DESCRIPTION:"
@@ -104,6 +110,9 @@ program main
 		print *,"   -obs VAL"
 		print *,"Select points from observer VAL (default 0)."
 		print *,""
+		print *,"	-lw VAL"
+		print *,"When in line mode, if investigating single line for BH mass estimate, specify its wavelength."
+		print *,""
 		print *,"	-bl"
 		print *,"Reweight mode: Bin logarithmically, default is linear."
 		print *,""
@@ -126,10 +135,10 @@ program main
 		print *,"Extract mode, use only extracted photons."
 		print *,""
 		print *,"	-x"
-		print *,"Pointwise mode (peak)."
+		print *,"Pointwise mode."
 		print *,""
-		print *,"	-xc"
-		print *,"Pointwise mode (centroid)."
+		print *,"	-xo"
+		print *,"Pointwise only mode."
 		STOP
 	endif
 
@@ -342,6 +351,16 @@ program main
 				iArg=iArg+1				
 			endif
 
+		else if(cArg.EQ."-lw".OR.cArg.EQ."-LW")then
+			call get_command_argument(iArg+1, cArg)
+			read(cArg,*,iostat=iErr)rLineLambda
+			if(iErr.NE.0 )then
+				print *,"ERROR: Line wavelength argument '"//trim(cArg)//"' invalid!"
+				STOP
+			endif
+			iArg=iArg+2
+			bLineBHEstimate=.TRUE.
+
 		else if(cArg.EQ."-bg".OR.cArg.EQ."-BG")then
 			iArg=iArg+1
 			bReweightBinGeom=.TRUE.
@@ -368,9 +387,9 @@ program main
 		else if(cArg.EQ."-x".OR.cArg.EQ."-X")then
 			bPointwise=.TRUE.
 			iArg=iArg+1
-		else if(cArg.EQ."-xc".OR.cArg.EQ."-XC")then
+		else if(cArg.EQ."-xo".OR.cArg.EQ."-XO")then
 			bPointwise=.TRUE.
-			bPointwiceCent=.TRUE.
+			bPointwiseOnly=.TRUE.
 			iArg=iArg+1
 
 		else if(cArg.EQ."-i".OR.cArg.EQ."-I")then
@@ -392,6 +411,15 @@ program main
 		print *,"ERROR: Input file '"//trim(cFileIn)//".delay_dump' does not exist!"
 		STOP
 	endif
+	if(bLineBHEstimate.AND..NOT.bLineMode)then
+		print *,'Trying to estimate BH mass from a line, but no line is specified!'
+		STOP
+	endif
+	if(bLineBHEstimate.AND.iLines.GT.1)then
+		print *,'Trying to estimate BH mass from a line, but too many lines specified!'
+		STOP
+	endif
+
 	if(bLookupY .AND. rMinR.LT.0 .AND. bReweight)then
 		rRad  = rfGetKeyword(trim(cFileIn)//".pf","rstar")							!Units = cm
 		rMinR = rfGetKeyword(trim(cFileIn)//".pf","wind_keplerian.diskmin")*rRad 	!Units = rstar
@@ -648,14 +676,21 @@ program main
 		STOP
 	endif
 
+	!For each observer, output a plot
 	do iObs=iObserverMin+1,iObserverMax+1
+		!If there is only one observer, don't bother adding the name
 		if(iObservers.GT.1)then
 			print '(A,I0,A)','Writing to "'//trim(cFileOut)//'.',iObs-1,'.eps"'
 		else
 			print '(A)','Writing to "'//trim(cFileOut)//'.eps"'
 		endif
 
-		if(.NOT.bPointwise)then
+		!If we are tracking a single line to find the mass
+		if(bLineMode.AND.iLines.EQ.1)then
+			call sLineAnalysis(arMapX(:,iObs),arMapY(:,iObs),arBinX(:),arBinY(:), rLineLambda)
+		endif
+		
+		if(.not.bPointwiseOnly)then
 			open(iFileOut,file=trim(cFileOut)//".bin_XY",status="REPLACE",action="WRITE")
 			do j=1,iDimY
 				rPosY = rMinY+(j-.5)*(rMaxY-rMinY)/real(iDimY)
@@ -670,71 +705,19 @@ program main
 				end do
 			end do
 			close(iFileOut)
-		else
-			open(iFileOut,file=trim(cFileOut)//".bin_XY",status="REPLACE",action="WRITE")
+		endif
+		if(bPointwise)then
+			!If we're doing this pointwise, then for each
+			open(iFileOut,file=trim(cFileOut)//".bin_XYp",status="REPLACE",action="WRITE")
 			do i=1,iDimX
-				rPosX  = rMinX+(i-0.5)*(rMaxX-rMinX)/real(iDimX)
-				rPosXL = rMinX+(i-1.0)*(rMaxX-rMinX)/real(iDimX)
-				rPosXU = rMinX+(i-0.0)*(rMaxX-rMinX)/real(iDimX)
-				rPeakFlux = 0.0
+				rPathPeak = rfFindPeak(arMap(i,:,iObs), arBinY, iPathPeak)
+				rPathCent = rfFindCentroid(arMap(i,:,iObs), arBinY, rPathCentL, rPathCentU, 0.8*arBinY(iPathPeak))
 
-				do j=1,iDimY
-					if(arMap(i,j,iObs).GT.rPeakFlux) then
-						rPeakFlux = arMap(i,j,iObs)
-						rPathPeak = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
-						iPathPeak = j
-					endif
-				enddo
-
-				if(bPointwiceCent)then
-					rPathCent = 0.0
-					rFluxCent = 0.0
-
-					do j=1,iDimY
-						rPosY = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
-						if(rPosY .GE. 0.8*rPathPeak) then
-							rPathCent = rPathCent + arMap(i,j,iObs) * rPosY
-							rFluxCent = rFluxCent + arMap(i,j,iObs)
-						endif
-					enddo
-					if(rFluxCent.GT.0.0)then
-						rPathCent = rPathCent / rFluxCent
-						rFluxTemp = 0.0
-						rPathCentL = 0.0
-						rPathCentU = 0.0
-
-						do j=1,iDimY
-							rPosY = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
-							if(rPosY .GE. 0.8*rPathPeak) then
-								rFluxTemp = rFLuxTemp + arMap(i,j,iObs)
-								if(rFluxTemp/rFluxCent.LE.0.15865)then
-									rPathCentL = rPosY
-								elseif(rFluxTemp/rFluxCent.LE.0.84135)then
-									rPathCentU = rPosY
-								endif
-							endif
-
-						enddo
-						write(iFileOut,'(6(ES12.5,1X))') rPosX, rPosXL, rPosXU, rPathCent, rPathCentL, rPathCentU
-					endif
-				else
-
-					if(rPeakFlux.GT.0.0)then
-						do j=iPathPeak,1,-1	
-							if(arMap(i,j,iObs).GE.rPeakFlux/2.0)then
-								rPathFWHMlower = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
-							endif
-						enddo
-
-						do j=iPathPeak,iDimY					
-							if(arMap(i,j,iObs).GE.rPeakFlux/2.0)then
-								rPathFWHMupper = rMinY+(j-0.5)*(rMaxY-rMinY)/real(iDimY)
-							endif
-						enddo
-						write(iFileOut,'(6(ES12.5,1X))') rPosX, rPosXL, rPosXU, rPathPeak, rPathFWHMlower, rPathFWHMupper
-						
-					endif
+				if(rPathCent > 0)then
+					write(iFileOut,'(6(ES12.5,1X))') (arBinX(i)+arBinX(i+1))/2, arBinX(i), arBinX(i+1),&
+													 rPathCent, rPathCentL, rPathCentU
 				endif
+				
 			end do
 			close(iFileOut)
 		endif
@@ -772,12 +755,12 @@ program main
 		endif
 		write(iFileOut,'(A)')'set multiplot'
 		write(iFileOut,'(A)')'set bmargin 0; set tmargin 0; set lmargin 0; set rmargin 0'
-		if(.NOT.bNoLog.AND..NOT.bPointwise)then
+		if(.NOT.bNoLog.AND..NOT.bPointwiseOnly)then
 			write(iFileOut,'(A)')'set log cb'
 		endif
 		write(iFileOut,'(A)')'set colorbox user origin 0.65,0.05 size .05,0.3'
 		write(iFileOut,'(A)')'set cblabel "Luminosity (ergs s^{-1})"'
-		if(bNoKey.OR.bPointwise)then
+		if(bNoKey.OR.bPointwiseOnly)then
 			write(iFileOut,'(A)')'unset colorbox'		
 		endif
 
@@ -799,8 +782,11 @@ program main
 		if(bChangeCB)then
 			write(iFileOut,'(A)')'set cbrange ['//trim(r2c(rMinCB))//':'//trim(r2c(rMaxCB))//']'
 		endif
-		if(bPointwise)then
-			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:4:2:3:5:6 w xyerrorbars notitle'
+		if(bPointwiseOnly)then
+			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XYp" u 1:4:2:3:5:6 w xyerrorbars notitle'
+		elseif(bPointwise)then
+			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3 w ima notitle, \'
+			write(iFileOut,'(A)')' "'//trim(cFileOut)//'.bin_XYp" u 1:4:2:3:5:6 w xyerrorbars notitle linewidth 3.0 lc rgb "light-magenta"'
 		else
 			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XY" u 1:2:3 w ima notitle'
 		endif
@@ -855,6 +841,128 @@ program main
 	print *,"Finished"
 
 contains
+	Subroutine sLineAnalysis(arMapWave, arMapPath, arBinWave, arBinPath, rLineWave)
+		Real(iKindDP), intent(in), dimension(:)	:: arMapWave, arMapPath, arBinWave, arBinPath
+		Real(iKindDP), intent(in)				:: rLineWave
+		Real(iKindDP)	:: rWaveFWHM, rFreqPeak, rPathPeak, rPathCent, rPathCentU, rPathCentL
+		Real(iKindDP)	:: rVelocity, rMass, rRadiusMin, rRadiusMax, rMassMin, rMassMax, rRadius
+		Real(iKindDP)	:: rFormFactor, rFormFactorError
+		Integer 		:: iPathPeak
+
+		rPathPeak = rfFindPeak(arMapPath, arBinPath, iPathPeak)
+		rPathCent = rfFindCentroid(arMapPath, arBinPath, rPathCentL, rPathCentU, 0.8*arBinPath(iPathPeak))
+		rWaveFWHM = rfFindFWHM(arMapWave, arBinWave)
+		print *,'Path centroid for line: '//trim(r2c(rPathCent))//' days (1σ: '//trim(r2c(rPathCentL))//' - '//trim(r2c(rPathCentU))//' days)'
+		print *,'FWHM for line:',rWaveFWHM
+		
+		rFormFactor = 5.0
+		rFormFactorError = 2.0
+
+		rVelocity 	= rcC 		  * rWaveFWHM   / rLineWave
+		rRadius 	= rPathCent   * rSecsToDays * rcC
+		rRadiusMin 	= rPathCentL  * rSecsToDays * rcC
+		rRadiusMax 	= rPathCentU  * rSecsToDays * rcC
+		rMass 		= rFormFactor * rRadius 	* rVelocity**2 / (rcG * rcMSol)
+		rMassMin 	= (rFormFactor - rFormFactorError) * rRadiusMin	* rVelocity**2 / (rcG * rcMSol)
+		rMassMax 	= (rFormFactor + rFormFactorError) * rRadiusMax * rVelocity**2 / (rcG * rcMSol)
+
+		print '(A)',' Mass for line: '//trim(r2c(rMass))//' ('//trim(r2c(rMassMin)),' - '//trim(r2c(rMassMax))//')'
+	End Subroutine
+
+	Real(iKindDP) Function rfFindFWHM(arVal, arBin)
+		Real(iKindDP), intent(in), dimension(:)		:: arVal, arBin
+		Real(iKindDP)	:: rPeak, rPeakVal, rHalfL, rHalfU
+		Integer 		:: i, iPeak
+
+		rPeak = rfFindPeak(arVal, arBin, iPeak, rPeakVal)
+
+		do i=iPeak,size(arVal)
+			if(arVal(i).LE.rPeakVal/2.0)then
+				rHalfL = arBin(i)
+				EXIT
+			endif
+		enddo
+		do i=iPeak,1,-1
+			if(arVal(i).LE.rPeakVal/2.0)then
+				rHalfU = arBin(i+1)
+				EXIT
+			endif			 
+		enddo
+		rfFindFWHM = rHalfU - rHalfL
+	End Function
+
+
+	Real(iKindDP) Function rfFindCentroid(arVal, arBin, rCentLOpt, rCentUOpt, rThresholdOpt)
+		Real(iKindDP), intent(in), dimension(:) 	:: arVal, arBin
+		Real(iKindDP), intent(in), optional 		:: rThresholdOpt
+		Real(iKindDP), intent(out),optional			:: rCentLOpt, rCentUOpt
+		Real(iKindDP)	:: rThreshold = 0.0, rVal, rValCent, rValCentL, rValCentU, rCentL, rCentU, rCent
+		Integer 		:: i
+		Logical 		:: bFoundCentL, bFoundCentU
+
+		if(present(rThresholdOpt)) rThreshold = rThresholdOpt
+		rCent		= 0.0
+		rValCent 	= 0.0
+	
+		do i=1,size(arVal)
+			if(arBin(i) .GE. rThreshold) then
+				rCent 		= rCent + (arVal(i) * ((arBin(i)+arBin(i+1))/ 2))
+				rValCent	= rValCent + arVal(i)
+			endif
+		enddo
+
+		if(rValCent.GT.0.0)then
+			rCent 		= rCent / rValCent
+			rCentL  	= rThreshold
+			rVal 		= 0.0
+			rValCentL	= rValCent * 0.15865
+			rValCentU  = rValCent * 0.84135
+			bFoundCentL = .FALSE.
+			bFoundCentU = .FALSE.
+
+			do i=1,size(arVal)
+				if(arBin(i) .GE. rThreshold) then
+					rVal = rVal + arVal(i)
+					if(.not.bFoundCentL.AND.rVal.GT.rValCentL)then
+						rCentL = arBin(i)
+						bFoundCentL = .TRUE.
+					endif
+					if(.not.bFoundCentU.AND.rVal.GT.rValCentU)then
+						rCentU = arBin(i+1)
+						bFoundCentU = .TRUE.
+					endif
+				endif
+			enddo
+		else
+			rCent 	= 0.0
+			rCentL	= 0.0
+			rCentU	= 0.0
+		endif
+		if(present(rCentLOpt)) rCentLOpt = rCentL
+		if(present(rCentUOpt)) rCentUOpt = rCentU
+		rfFindCentroid = rCent
+	End Function
+
+	Real(iKindDP) Function rfFindPeak(arVal, arBin, iPeakOpt, rPeakValOpt)
+		Real(iKindDP), intent(in),	dimension(:)	:: arVal, arBin
+		Real(iKindDP), intent(out), optional		:: rPeakValOpt
+		Integer, intent(out), optional				:: iPeakOpt
+		Real(iKindDP)	:: rPeakVal, rPeak
+		Integer 		:: i, iPeak
+		rPeak = 0.0
+
+		do i=1, size(arVal) 
+			if(arVal(i).GT.rPeak) then
+				rPeakVal = arVal(i)
+				rPeak = (arBin(i)+arBin(i+1))/2
+				iPeak = i
+			endif
+		enddo
+		if(present(iPeakOpt)) iPeakOpt = iPeak
+		if(present(rPeakValOpt)) rPeakValOpt = rPeakVal
+		rfFindPeak = rPeak
+	End Function
+
 	character(len=32) function r2c(rIn)
 		real(iKindDP), intent(in) :: rIn
 		write(r2c,'(ES12.5)')rIn
@@ -942,4 +1050,5 @@ contains
 			fbIsKey = .FALSE.
 		endif
 	end function
+
 end program main
