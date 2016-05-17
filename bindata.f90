@@ -853,7 +853,7 @@ contains
 		rPathCent = rfFindCentroid(arMapPath, arBinPath, rPathCentL, rPathCentU, 0.8*arBinPath(iPathPeak))
 		rWaveFWHM = rfFindFWHM(arMapWave, arBinWave)
 		print *,'Path centroid for line: '//trim(r2c(rPathCent))//' days (1σ: '//trim(r2c(rPathCentL))//' - '//trim(r2c(rPathCentU))//' days)'
-		print *,'FWHM for line:',rWaveFWHM
+		print *,'FWHM for line:'//trim(r2c(rWaveFWHM))
 		
 		rFormFactor = 5.0
 		rFormFactorError = 2.0
@@ -866,7 +866,7 @@ contains
 		rMassMin 	= (rFormFactor - rFormFactorError) * rRadiusMin	* rVelocity**2 / (rcG * rcMSol)
 		rMassMax 	= (rFormFactor + rFormFactorError) * rRadiusMax * rVelocity**2 / (rcG * rcMSol)
 
-		print '(A)',' Mass for line: '//trim(r2c(rMass))//' ('//trim(r2c(rMassMin))//' - '//trim(r2c(rMassMax))//')'
+		print *,'Mass for line: '//trim(r2c(rMass))//' ('//trim(r2c(rMassMin))//' - '//trim(r2c(rMassMax))//')'
 	End Subroutine
 
 	Real(iKindDP) Function rfFindFWHM(arVal, arBin)
@@ -950,10 +950,10 @@ contains
 		Integer, intent(out), optional				:: iPeakOpt
 		Real(iKindDP)	:: rPeakVal, rPeak
 		Integer 		:: i, iPeak
-		rPeak = 0.0
+		rPeakVal = 0.0
 
 		do i=1, size(arVal) 
-			if(arVal(i).GT.rPeak) then
+			if(arVal(i).GT.rPeakVal) then
 				rPeakVal = arVal(i)
 				rPeak = (arBin(i)+arBin(i+1))/2
 				iPeak = i
