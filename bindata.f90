@@ -866,7 +866,7 @@ contains
 		rMassMin 	= (rFormFactor - rFormFactorError) * rRadiusMin	* rVelocity**2 / (rcG * rcMSol)
 		rMassMax 	= (rFormFactor + rFormFactorError) * rRadiusMax * rVelocity**2 / (rcG * rcMSol)
 
-		print '(A)',' Mass for line: '//trim(r2c(rMass))//' ('//trim(r2c(rMassMin)),' - '//trim(r2c(rMassMax))//')'
+		print '(A)',' Mass for line: '//trim(r2c(rMass))//' ('//trim(r2c(rMassMin))//' - '//trim(r2c(rMassMax))//')'
 	End Subroutine
 
 	Real(iKindDP) Function rfFindFWHM(arVal, arBin)
@@ -888,6 +888,7 @@ contains
 				EXIT
 			endif			 
 		enddo
+		print *,'DEBUG FWHM: ',rHalfU,rHalfL,rHalfU-rHalfL
 		rfFindFWHM = rHalfU - rHalfL
 	End Function
 
