@@ -850,7 +850,7 @@ contains
 		Integer 		:: iPathPeak
 
 		rPathPeak = rfFindPeak(arMapPath, arBinPath, iPathPeak)
-		rPathCent = rfFindCentroid(arMapPath, arBinPath, rPathCentL, rPathCentU, 0.8*arBinPath(iPathPeak))
+		rPathCent = rfFindCentroid(arMapPath, arBinPath, rPathCentL, rPathCentU)!, 0.8*arBinPath(iPathPeak))
 		rWaveFWHM = rfFindFWHM(arMapWave, arBinWave)
 		print *,'Path centroid for line: '//trim(r2c(rPathCent))//' days (1σ: '//trim(r2c(rPathCentL))//' - '//trim(r2c(rPathCentU))//' days)'
 		print *,'FWHM for line:'//trim(r2c(rWaveFWHM))
@@ -878,13 +878,13 @@ contains
 
 		do i=iPeak,size(arVal)
 			if(arVal(i).LE.rPeakVal/2.0)then
-				rHalfL = arBin(i)
+				rHalfU = arBin(i)
 				EXIT
 			endif
 		enddo
 		do i=iPeak,1,-1
 			if(arVal(i).LE.rPeakVal/2.0)then
-				rHalfU = arBin(i+1)
+				rHalfL = arBin(i+1)
 				EXIT
 			endif			 
 		enddo
@@ -917,7 +917,7 @@ contains
 			rCentL  	= rThreshold
 			rVal 		= 0.0
 			rValCentL	= rValCent * 0.15865
-			rValCentU  = rValCent * 0.84135
+			rValCentU  	= rValCent * 0.84135
 			bFoundCentL = .FALSE.
 			bFoundCentU = .FALSE.
 
