@@ -687,7 +687,7 @@ program main
 
 		!If we are tracking a single line to find the mass
 		if(bLineMode.AND.iLines.EQ.1)then
-			call sLineAnalysis(arMapX(:,iObs),arMapY(:,iObs),arBinX(:),arBinY(:), rLineLambda)
+			call sLineAnalysis(arMapX(:,iObs),arMapY(:,iObs),arBinX,arBinY, rLineLambda)
 		endif
 		
 		if(.not.bPointwiseOnly)then
@@ -850,7 +850,7 @@ contains
 		Integer 		:: iPathPeak
 
 		rPathPeak = rfFindPeak(arMapPath, arBinPath, iPathPeak)
-		rPathCent = rfFindCentroid(arMapPath, arBinPath, rPathCentL, rPathCentU)!, 0.8*arBinPath(iPathPeak))
+		rPathCent = rfFindCentroid(arMapPath, arBinPath, rPathCentL, rPathCentU, 0.8*arBinPath(iPathPeak))
 		rWaveFWHM = rfFindFWHM(arMapWave, arBinWave)
 		print *,'Path centroid for line: '//trim(r2c(rPathCent))//' days (1σ: '//trim(r2c(rPathCentL))//' - '//trim(r2c(rPathCentU))//' days)'
 		print *,'FWHM for line:'//trim(r2c(rWaveFWHM))
@@ -888,7 +888,6 @@ contains
 				EXIT
 			endif			 
 		enddo
-		print *,'DEBUG FWHM: ',rHalfU,rHalfL,rHalfU-rHalfL
 		rfFindFWHM = rHalfU - rHalfL
 	End Function
 
@@ -897,38 +896,39 @@ contains
 		Real(iKindDP), intent(in), dimension(:) 	:: arVal, arBin
 		Real(iKindDP), intent(in), optional 		:: rThresholdOpt
 		Real(iKindDP), intent(out),optional			:: rCentLOpt, rCentUOpt
-		Real(iKindDP)	:: rThreshold = 0.0, rVal, rValCent, rValCentL, rValCentU, rCentL, rCentU, rCent
+		Real(iKindDP)	:: rVal, rValCent, rCentL, rCentU, rCent, rThreshold
 		Integer 		:: i
-		Logical 		:: bFoundCentL, bFoundCentU
+		Logical 		:: bFoundCentL, bFoundCentU, bFoundCent
 
-		if(present(rThresholdOpt)) rThreshold = rThresholdOpt
-		rCent		= 0.0
 		rValCent 	= 0.0
+		rThreshold 	= 0.0
+		if(present(rThresholdOpt)) rThreshold = rThresholdOpt
 	
 		do i=1,size(arVal)
 			if(arBin(i) .GE. rThreshold) then
-				rCent 		= rCent + (arVal(i) * ((arBin(i)+arBin(i+1))/ 2))
 				rValCent	= rValCent + arVal(i)
 			endif
 		enddo
 
 		if(rValCent.GT.0.0)then
-			rCent 		= rCent / rValCent
 			rCentL  	= rThreshold
 			rVal 		= 0.0
-			rValCentL	= rValCent * 0.15865
-			rValCentU  	= rValCent * 0.84135
 			bFoundCentL = .FALSE.
 			bFoundCentU = .FALSE.
+			bFoundCent  = .FALSE.
 
 			do i=1,size(arVal)
 				if(arBin(i) .GE. rThreshold) then
 					rVal = rVal + arVal(i)
-					if(.not.bFoundCentL.AND.rVal.GT.rValCentL)then
+					if(.not.bFoundCentL.AND.rVal.GT.rValCent*0.15865)then
 						rCentL = arBin(i)
 						bFoundCentL = .TRUE.
 					endif
-					if(.not.bFoundCentU.AND.rVal.GT.rValCentU)then
+					if(.not.bFoundCent .AND.rVal.GT.rValCent*0.5)then
+						rCent = (arBin(i)+arBin(i+1))/2
+						bFoundCent  = .TRUE.
+					endif
+					if(.not.bFoundCentU.AND.rVal.GT.rValCent*0.84135)then
 						rCentU = arBin(i+1)
 						bFoundCentU = .TRUE.
 					endif
