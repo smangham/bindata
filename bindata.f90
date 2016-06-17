@@ -1,12 +1,16 @@
 program main
 	IMPLICIT NONE
 
+	!Program parameters
 	integer, parameter 			:: iFileIn=100,iFileOut=101
 	integer, parameter 			:: iKindDP=selected_real_kind(15,300)
+
+	!Physical parameters
 	real(iKindDP), parameter 	:: rcPi = DACOS(-1.D0), rSecsToDays=86400.0, rcC=29979245800.0 !cm/s
 	real(iKindDP), parameter 	:: rcG = 6.67408e-8 !cgs
 	real(iKindDP), parameter 	:: rcMSol = 1.98855e33 !g
 
+	!Internals
 	logical				:: bFound, bMessy=.FALSE.
 	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
 	integer				:: iDimX=100, iDimY=100, iDimR=100
@@ -58,6 +62,8 @@ program main
 	integer				:: iOrigins=0, iOrigin
 	integer, allocatable		:: aiOrigin(:)
 
+	!Variables for outputting CDF
+	logical 			:: bCDF=.FALSE.
 	!Centroid delay variables
 	real(iKindDP)		:: rDelayCent, rDelayL, rDelayU
 
@@ -341,12 +347,11 @@ program main
 			call get_command_argument(iArg, cArg)
 			read(cArg,*,iostat=iErr)iObserverMax
 			if(iErr.NE.0)then
-				!Nothing
+				!If there is no valid upper bound
+				iObserverMax = iObserverMin
 			else if(iObserverMax.LT.iObserverMin)then
-				iObserver = iObserverMin
-				iObserverMin = iObserverMax
-				iObserverMax = iObserver	
-				iArg=iArg+1							
+				print *,"ERROR: Observer range must be low to high!"
+				STOP					
 			else
 				iArg=iArg+1				
 			endif
@@ -451,9 +456,13 @@ program main
 	endif
 
 
-
-	allocate(aiMapX(iDimX,iObservers), aiMapY(iDimY,iObservers), aiMapR(iDimR), aiMap(iDimX,iDimY,iObservers))
-	allocate(arMapX(iDimX,iObservers), arMapY(iDimY,iObservers), arMapR(iDimR), arMap(iDimX,iDimY,iObservers))
+!	============================================================================
+!	ALLOCATION AND ZEROING SECTION
+!	----------------------------------------------------------------------------
+	allocate(aiMapX(iDimX,iObserverMin:iObserverMax), aiMapY(iDimY,iObserverMin:iObserverMax))
+	allocate(aiMapR(iDimR), aiMap(iDimX,iDimY,iObserverMin:iObserverMax))
+	allocate(arMapX(iDimX,iObserverMin:iObserverMax), arMapY(iDimY,iObserverMin:iObserverMax))
+	allocate(arMapR(iDimR), arMap(iDimX,iDimY,iObserverMin:iObserverMax))
 	allocate(arBinX(iDimX+1), arBinY(iDimY+1))
 
 	do i=0,iDimX
@@ -470,7 +479,6 @@ program main
 	arMap=0.0
 	arMapX=0.0
 	arMapY=0.0
-
 
 !	============================================================================
 !	REWEIGHTING SECTION
@@ -517,7 +525,7 @@ program main
 			read(iFileIn,'(A512)',iostat=iEOF) cBuffer
 			if(cBuffer(1:1).NE."#")then
 				read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
-											iNScat, iNRScat, rDelay, iExtracted
+											iNScat, iNRScat, rDelay, iObserver, iOrigin, iNRes
 
 				if(iErr.GT.0)then
 					iErr=0
@@ -565,13 +573,13 @@ program main
 	open(iFileIn,file=trim(cFileIn)//".delay_dump",status="OLD",action="READ")
 	read(iFileIn,*) cDummy
 	iLine=iLine+1
-	do while(iErr.EQ.0.AND.iEOF.EQ.0)
+	do while(iErr.EQ.0 .AND.iEOF.EQ.0)
 		read(iFileIn,'(A512)',iostat=iEOF) cBuffer
 		iLine=iLine+1
 		if(cBuffer(1:1).NE."#")then
 			iPhot=iPhot+1
 			read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
-										iNScat, iNRScat, rDelay, iExtracted, iObserver, iOrigin, iNRes
+										iNScat, iNRScat, rDelay, iObserver, iOrigin, iNRes
 			iNCScat = iNScat - iNRScat
 
 			!If we're in line mode, check to see if this photon's origin line is in the list of tracked lines
@@ -635,12 +643,12 @@ program main
 						iBinR	= ifLookupIndex(arBinR, rRad)
 						if(iBinR .GT. -1)then
 							rWeight = arReweightMult(iBinR) * rWeight * rRad**(-1.5)
-							aiMap(iBinX,iBinY,iObserver+1) 	= aiMap(iBinX,iBinY,iObserver+1) + 1
-							arMap(iBinX,iBinY,iObserver+1) 	= arMap(iBinX,iBinY,iObserver+1) + rWeight
-							aiMapX(iBinX,iObserver+1) 		= aiMapX(iBinX,iObserver+1) + 1
-							arMapX(iBinX,iObserver+1) 		= arMapX(iBinX,iObserver+1) + rWeight
-							aiMapY(iBinY,iObserver+1) 		= aiMapY(iBinY,iObserver+1) + 1
-							arMapY(iBinY,iObserver+1) 		= arMapY(iBinY,iObserver+1) + rWeight
+							aiMap(iBinX,iBinY,iObserver) 	= aiMap(iBinX,iBinY,iObserver) + 1
+							arMap(iBinX,iBinY,iObserver) 	= arMap(iBinX,iBinY,iObserver) + rWeight
+							aiMapX(iBinX,iObserver) 		= aiMapX(iBinX,iObserver) + 1
+							arMapX(iBinX,iObserver) 		= arMapX(iBinX,iObserver) + rWeight
+							aiMapY(iBinY,iObserver) 		= aiMapY(iBinY,iObserver) + 1
+							arMapY(iBinY,iObserver) 		= arMapY(iBinY,iObserver) + rWeight
 						else
 							iErrWeight=iErrWeight+1
 							if(iErrWeight.LT.10)then
@@ -651,12 +659,12 @@ program main
 							endif
 						endif
 					else
-						aiMap(iBinX,iBinY,iObserver+1) = 	aiMap(iBinX,iBinY,iObserver+1) + 1
-						arMap(iBinX,iBinY,iObserver+1) = 	arMap(iBinX,iBinY,iObserver+1) + rWeight
-						aiMapX(iBinX,iObserver+1) = 		aiMapX(iBinX,iObserver+1) + 1
-						arMapX(iBinX,iObserver+1) = 		arMapX(iBinX,iObserver+1) + rWeight
-						aiMapY(iBinY,iObserver+1) = 		aiMapY(iBinY,iObserver+1) + 1
-						arMapY(iBinY,iObserver+1) = 		arMapY(iBinY,iObserver+1) + rWeight
+						aiMap(iBinX,iBinY,iObserver) = 	aiMap(iBinX,iBinY,iObserver) + 1
+						arMap(iBinX,iBinY,iObserver) = 	arMap(iBinX,iBinY,iObserver) + rWeight
+						aiMapX(iBinX,iObserver) = 		aiMapX(iBinX,iObserver) + 1
+						arMapX(iBinX,iObserver) = 		arMapX(iBinX,iObserver) + rWeight
+						aiMapY(iBinY,iObserver) = 		aiMapY(iBinY,iObserver) + 1
+						arMapY(iBinY,iObserver) = 		arMapY(iBinY,iObserver) + rWeight
 					endif
 
 				endif
@@ -677,10 +685,10 @@ program main
 	endif
 
 	!For each observer, output a plot
-	do iObs=iObserverMin+1,iObserverMax+1
+	do iObs=iObserverMin,iObserverMax
 		!If there is only one observer, don't bother adding the name
 		if(iObservers.GT.1)then
-			print '(A,I0,A)','Writing to "'//trim(cFileOut)//'.',iObs-1,'.eps"'
+			print '(A,I0,A)','Writing to "'//trim(cFileOut)//'.',iObs,'.eps"'
 		else
 			print '(A)','Writing to "'//trim(cFileOut)//'.eps"'
 		endif
@@ -749,7 +757,7 @@ program main
 		open(iFileOut,file=trim(cFileOut)//".plot",status="REPLACE",action="WRITE")
 		write(iFileOut,'(A)')'set term postscript eps color enhanced'
 		if(iObservers.GT.1)then
-			write(iFileOut,'(A,I0,A)')'set output "'//trim(cFileOut)//'.',iObs-1,'.eps"'
+			write(iFileOut,'(A,I0,A)')'set output "'//trim(cFileOut)//'.',iObs,'.eps"'
 		else
 			write(iFileOut,'(A)')'set output "'//trim(cFileOut)//'.eps"'
 		endif
