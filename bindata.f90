@@ -12,9 +12,9 @@ program main
 
 	!Internals
 	logical				:: bFound, bMessy=.FALSE.
-	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE., bUseExtracted=.FALSE.
+	logical				:: bAllScat=.FALSE., bNoLog=.FALSE., bLineMalformed=.FALSE.
 	integer				:: iDimX=100, iDimY=100, iDimR=100
-	integer				:: i,j,k,iErr=0, iEOF=0, iDummy, iBinX, iBinY, iBinR, iPhot=0,iPhotR=0, iPhotRE=0,iExtracted
+	integer				:: i,j,k,iErr=0, iEOF=0, iDummy, iBinX, iBinY, iBinR, iPhot=0,iPhotR=0
 	integer				:: iArg=1, iArg_iter
 	integer 			:: iObserver, iObserverMin=0, iObserverMax=0, iObservers=1, iObs
 	integer, allocatable			:: aiMap(:,:,:),aiMapX(:,:),aiMapY(:,:),aiMapR(:)
@@ -136,9 +136,6 @@ program main
 		print *,""
 		print *,"	-nt"
 		print *,"No ticks, remove tick numbers from plots."
-		print *,""
-		print *,"	-e"
-		print *,"Extract mode, use only extracted photons."
 		print *,""
 		print *,"	-x"
 		print *,"Pointwise mode."
@@ -373,9 +370,6 @@ program main
 			iArg=iArg+1
 			bReweightBinLog=.TRUE.
 
-		else if(cArg.EQ."-e".OR.cArg.EQ."-E")then
-			bUseExtracted=.TRUE.
-			iArg=iArg+1
 		else if(cArg.EQ."-m".OR.cArg.EQ."-M")then
 			bMessy=.TRUE.
 			iArg=iArg+1
@@ -530,7 +524,7 @@ program main
 				if(iErr.GT.0)then
 					iErr=0
 					iEOF=0
-				elseif(iNScat.EQ.1 .AND. iExtracted.EQ.0) then
+				elseif(iNScat.EQ.1) then
 					iBinR = ifLookupIndex(arBinR, sqrt(rPosX**2+rPosY**2) )
 					if(iBinR.GT.0)then
 						aiMapR(iBinR) = aiMapR(iBinR) + 1
@@ -566,7 +560,6 @@ program main
 
 	print *,"Reading in '"//trim(cFileIn)//".delay_dump'..."
 	iPhotR =0
-	iPhotRE=0
 	iErr=0
 	iEOF=0
 	iLine=0
@@ -576,6 +569,7 @@ program main
 	do while(iErr.EQ.0 .AND.iEOF.EQ.0)
 		read(iFileIn,'(A512)',iostat=iEOF) cBuffer
 		iLine=iLine+1
+		
 		if(cBuffer(1:1).NE."#")then
 			iPhot=iPhot+1
 			read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
@@ -607,10 +601,6 @@ program main
 					print '(X,A,I0,A)','WARNING: Malformed entry on line ',iLine,'. Suppressing further warnings.'
 				endif
 
-			elseif(iExtracted.EQ.1 .AND..NOT.bUseExtracted)then
-				!Do nothing
-			elseif(iExtracted.EQ.0 .AND.bUseExtracted)then
-				!Do nothing
 			elseif(iObserver.LT.iObserverMin.OR.iObserver.GT.iObserverMax)then
 				!Do nothing
 			elseif(bLineMode.AND..NOT.bLineFound)then
@@ -624,7 +614,6 @@ program main
 			else 
 
 				iPhotR= iPhotR+1
-				iPhotRE=iPhotRE+iExtracted
 				iBinX = ifLookupIndex(arBinX,rLambda)
 				iBinY = ifLookupIndex(arBinY,rDelay/rSecsToDays)
 				if(iBinX.LT.1 .OR. iBinY.LT.1)then
@@ -677,7 +666,6 @@ program main
 	if(iErrMalf.GT.0)print '(X,A,I0,A)',"WARNING: ",iErrMalf," lines in the file were malformed."
 
 	print '(X,I0,A,I0,A,I0,A)',iPhotR,"/",iPhot," photons scattered."
-	if(bUseExtracted) print '(X,A,I0,A)', " of which ",iPhotRE," were extracted."
 
 	if(iPhotR.EQ.0)then
 		print *,'ERROR: No photons fit scattering parameters'
