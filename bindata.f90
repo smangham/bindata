@@ -794,8 +794,8 @@ program main
 			rLineLambdaLower = rLineLambda + (rLineLambda * rLineVelLower / (rcC*100.0))
 
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
-							', '//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
-							', "0" '//trim(r2c(rLineLambda))//', '//&
+							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
+							', "0" '//trim(r2c(rLineLambda))//&
 							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
 							', '//trim(r2c(rMaxX))//') mirror format ""'	
 		else
@@ -854,8 +854,8 @@ program main
 			continue
 		elseif(bLineVel)then
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
-							', '//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
-							', "0" '//trim(r2c(rLineLambda))//', '//&
+							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
+							', "0" '//trim(r2c(rLineLambda))//&
 							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
 							', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)	
 		else
