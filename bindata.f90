@@ -43,10 +43,11 @@ program main
 	real(iKindDP), allocatable	:: arMapR(:),arBinR(:),arPosR(:),arReweightMult(:)
 
 	!Line mode variables
-	logical 			:: bLineMode=.FALSE., bLineFound=.FALSE., bLineBHEstimate=.FALSE.
+	logical 			:: bLineMode=.FALSE., bLineFound=.FALSE., bLineBHEstimate=.FALSE., bLineBHUseRMS=.FALSE.
 	integer				:: iLines=0, iNRes
 	integer, allocatable 		:: aiLine(:)
-	real(iKindDP)		:: rLineLambda
+	real(iKindDP)		:: rLineLambda, rLineLambdaUpper, rLineLambdaLower, rLineVelUpper, rLineVelLower, rLineVelMax, rLineVelMin
+	logical 			:: bLineVel=.FALSE.
 
 	!Error tracking variables
 	integer				:: iErrWeight=0, iErrMalf=0, iErrLog=0
@@ -119,6 +120,9 @@ program main
 		print *,"	-lw VAL"
 		print *,"When in line mode, if investigating single line for BH mass estimate, specify its wavelength."
 		print *,""
+		print *,"	-rms"
+		print *,"When making virial mass estimate, use line RMS error instead of FWHM."
+		print *,""
 		print *,"	-bl"
 		print *,"Reweight mode: Bin logarithmically, default is linear."
 		print *,""
@@ -142,6 +146,9 @@ program main
 		print *,""
 		print *,"	-xo"
 		print *,"Pointwise only mode."
+		print *,""		
+		print *,"	-vel"
+		print *,"Plot using velocity, not frequency. Requires -lw."
 		STOP
 	endif
 
@@ -390,6 +397,9 @@ program main
 			bPointwise=.TRUE.
 			bPointwiseOnly=.TRUE.
 			iArg=iArg+1
+		else if(cArg.EQ."-vel".OR.cArg.EQ."-VEL")then
+			bLineVel=.TRUE.
+			iArg=iArg+1
 
 		else if(cArg.EQ."-i".OR.cArg.EQ."-I")then
 			call get_command_argument(iArg+1, cFileIn)
@@ -416,6 +426,10 @@ program main
 	endif
 	if(bLineBHEstimate.AND.iLines.GT.1)then
 		print *,'Trying to estimate BH mass from a line, but too many lines specified!'
+		STOP
+	endif
+	if(bLineVel.AND..NOT.bLineBHEstimate)then
+		print *,'Trying to plot line velocity without knowing line wavelength!'
 		STOP
 	endif
 
@@ -765,9 +779,31 @@ program main
 		write(iFileOut,'(A)')'set xrange ['//trim(r2c(rMinX))//':'//trim(r2c(rMaxX))//']'
 		write(iFileOut,'(A)')'set yrange ['//trim(r2c(rMinY))//':'//trim(r2c(rMaxY))//']'
 
-		write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
-						', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
-						', '//trim(r2c(rMaxX))//') mirror format ""'
+		if(bLineVel)then
+			rLineLambdaUpper = rMaxX - modulo(rMaxX, 100.0)
+			rLineLambdaLower = rMinX + (100- modulo(rMinX, 100.0))
+			rLineVelMax = 100.0 * rcC * (rMaxX - rLineLambda)/ rLineLambda
+			rLineVelMin = 100.0 * rcC * (rLineLambda - rMinX)/ rLineLambda
+			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 100.0)
+			if(modulo(rLineVelMax,100.0)>0)then
+				rLineVelLower = rLineVelMin + (100 - modulo(rLineVelMax, 100.0))
+			else
+				rLineVelLower = rLineVelMin
+			endif
+			rLineLambdaUpper = rLineLambda + (rLineLambda * rLineVelUpper / (rcC*100.0))
+			rLineLambdaLower = rLineLambda + (rLineLambda * rLineVelLower / (rcC*100.0))
+
+			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
+							', '//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
+							', "0" '//trim(r2c(rLineLambda))//', '//&
+							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
+							', '//trim(r2c(rMaxX))//') mirror format ""'	
+		else
+			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
+							', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
+							', '//trim(r2c(rMaxX))//') mirror format ""'
+		endif
+
 		write(iFileOut,'(A)')'unset xlabel'
 		write(iFileOut,'(A)')'set ytics ('//trim(r2c(rMinY))//', '//trim(r2c(rMinY+.25*rRngY))//&
 						', '//trim(r2c(rMinY+.5*rRngY))//', '//trim(r2c(rMinY+.75*rRngY))//&
@@ -814,10 +850,21 @@ program main
 		write(iFileOut,'(A)')'set xrange ['//trim(r2c(rMinX))//':'//trim(r2c(rMaxX))//'] noreverse'
 		write(iFileOut,'(A)')'set yrange [*:*]'
 
-		if(.NOT.bNoTicks)write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
-		write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
-						', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
-						', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)
+		if(bNoTicks)then
+			continue
+		elseif(bLineVel)then
+			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
+							', '//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
+							', "0" '//trim(r2c(rLineLambda))//', '//&
+							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
+							', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)	
+		else
+			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
+			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
+							', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
+							', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)
+		endif
+
 		write(iFileOut,'(A)')'set ytics autofreq format ""'
 		write(iFileOut,'(A)')'unset ylabel'
 		write(iFileOut,'(A)')'unset y2tics'
@@ -840,21 +887,25 @@ contains
 	Subroutine sLineAnalysis(arMapWave, arMapPath, arBinWave, arBinPath, rLineWave)
 		Real(iKindDP), intent(in), dimension(:)	:: arMapWave, arMapPath, arBinWave, arBinPath
 		Real(iKindDP), intent(in)				:: rLineWave
-		Real(iKindDP)	:: rWaveFWHM, rFreqPeak, rPathPeak, rPathCent, rPathCentU, rPathCentL
+		Real(iKindDP)	:: rWaveWidth, rFreqPeak, rPathPeak, rPathCent, rPathCentU, rPathCentL
 		Real(iKindDP)	:: rVelocity, rMass, rRadiusMin, rRadiusMax, rMassMin, rMassMax, rRadius
 		Real(iKindDP)	:: rFormFactor, rFormFactorError
 		Integer 		:: iPathPeak
 
 		rPathPeak = rfFindPeak(arMapPath, arBinPath, iPathPeak)
 		rPathCent = rfFindCentroid(arMapPath, arBinPath, rPathCentL, rPathCentU, 0.8*arBinPath(iPathPeak))
-		rWaveFWHM = rfFindFWHM(arMapWave, arBinWave)
+		if(bLineBHUseRMS)then
+			rWaveWidth = rfFindRMS(arMapWave, arBinWave, rPathCent)
+		else
+			rWaveWidth = rfFindFWHM(arMapWave, arBinWave)
+		endif
 		print *,'Path centroid for line: '//trim(r2c(rPathCent))//' days (1σ: '//trim(r2c(rPathCentL))//' - '//trim(r2c(rPathCentU))//' days)'
-		print *,'FWHM for line:'//trim(r2c(rWaveFWHM))
+		print *,'Width for line:'//trim(r2c(rWaveWidth))
 		
 		rFormFactor = 5.0
-		rFormFactorError = 2.0
+		rFormFactorError = 1.0
 
-		rVelocity 	= rcC 		  * rWaveFWHM   / rLineWave
+		rVelocity 	= rcC 		  * rWaveWidth  / rLineWave
 		rRadius 	= rPathCent   * rSecsToDays * rcC
 		rRadiusMin 	= rPathCentL  * rSecsToDays * rcC
 		rRadiusMax 	= rPathCentU  * rSecsToDays * rcC
@@ -887,6 +938,23 @@ contains
 		rfFindFWHM = rHalfU - rHalfL
 	End Function
 
+	Real(iKindDP) Function rfFindRMS(arVal, arBin, rPeak)
+		Real(iKindDP), intent(in), dimension(:)		:: arVal, arBin
+		Real(iKindDP), intent(in)					:: rPeak
+		Real(iKindDP)	:: rRMS, rValTot
+		Integer 		:: i, iPeak
+
+		rValTot = 0.0
+		do i=1,size(arVal)
+			rValTot = rValTot + arVal(i)
+		enddo
+
+		do i=1,size(arVal)
+			rRMS = rRMS + (arVal(i) * (((arBin(i)+arBin(i+1))/2) - rPeak) ** 2.0)
+		enddo
+
+		rfFindRMS = sqrt(rRMS/rValTot)
+	End Function
 
 	Real(iKindDP) Function rfFindCentroid(arVal, arBin, rCentLOpt, rCentUOpt, rThresholdOpt)
 		Real(iKindDP), intent(in), dimension(:) 	:: arVal, arBin
