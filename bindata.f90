@@ -780,16 +780,16 @@ program main
 		write(iFileOut,'(A)')'set yrange ['//trim(r2c(rMinY))//':'//trim(r2c(rMaxY))//']'
 
 		if(bLineVel)then
-			rLineVelMax = 100.0 * rcC * (rMaxX - rLineLambda)/ rLineLambda
-			rLineVelMin = 100.0 * rcC * (rLineLambda - rMinX)/ rLineLambda
-			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 100.0)
+			rLineVelMax = (rcC/100.0) * (rMaxX - rLineLambda)/rLineLambda
+			rLineVelMin = (rcC/100.0) * (rLineLambda - rMinX)/rLineLambda
+			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 1000.0)
 			if(modulo(rLineVelMax,100.0)>0)then
-				rLineVelLower = rLineVelMin + (100 - modulo(rLineVelMax, 100.0))
+				rLineVelLower = rLineVelMin + (100 - modulo(rLineVelMax, 1000.0))
 			else
 				rLineVelLower = rLineVelMin
 			endif
-			rLineLambdaUpper = rLineLambda + (rLineLambda * rLineVelUpper / (rcC*100.0))
-			rLineLambdaLower = rLineLambda + (rLineLambda * rLineVelLower / (rcC*100.0))
+			rLineLambdaUpper = rLineLambda + (rLineLambda * rLineVelUpper / (rcC/100.0))
+			rLineLambdaLower = rLineLambda + (rLineLambda * rLineVelLower / (rcC/100.0))
 			print *,"w:",rLineLambdaLower,rLineLambdaUpper,"v:",rLineVelLower,rLineVelUpper
 
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
@@ -856,7 +856,7 @@ program main
 							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
 							', "0" '//trim(r2c(rLineLambda))//&
 							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
-							', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)	
+							', '//trim(r2c(rMaxX))//') mirror format ""'
 		else
 			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
