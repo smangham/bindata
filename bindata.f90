@@ -782,9 +782,9 @@ program main
 		if(bLineVel)then
 			rLineVelMax = (rcC/1e5) * (rMaxX - rLineLambda)/rLineLambda
 			rLineVelMin = (rcC/1e5) * (rMinX - rLineLambda)/rLineLambda
-			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 100.0)
-			if(modulo(rLineVelMin,100.0)>0)then
-				rLineVelLower = rLineVelMin + (100.0 - modulo(rLineVelMin, 100.0))
+			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 1000.0)
+			if(modulo(rLineVelMin,1000.0)>0)then
+				rLineVelLower = rLineVelMin + (1000.0 - modulo(rLineVelMin, 100.0))
 			else
 				rLineVelLower = rLineVelMin
 			endif
@@ -794,7 +794,9 @@ program main
 
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
 							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
+							', "'//trim(r2c(rLineVelLower/2))//'" '//trim(r2c(rLineLambdaLower/2))//&
 							', "0" '//trim(r2c(rLineLambda))//&
+							', "'//trim(r2c(rLineVelUpper/2))//'" '//trim(r2c(rLineLambdaUpper/2))//&
 							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
 							', '//trim(r2c(rMaxX))//') mirror format ""'	
 		else
@@ -855,9 +857,11 @@ program main
 			write(iFileOut,'(A)')'set xlabel "Velocity (km/s)"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
 							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
+							', "'//trim(r2c(rLineVelLower/2))//'" '//trim(r2c(rLineLambdaLower/2))//&
 							', "0" '//trim(r2c(rLineLambda))//&
+							', "'//trim(r2c(rLineVelUpper/2))//'" '//trim(r2c(rLineLambdaUpper/2))//&
 							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
-							', '//trim(r2c(rMaxX))//') mirror format ""'
+							', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)
 		else
 			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
