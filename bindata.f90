@@ -780,8 +780,6 @@ program main
 		write(iFileOut,'(A)')'set yrange ['//trim(r2c(rMinY))//':'//trim(r2c(rMaxY))//']'
 
 		if(bLineVel)then
-			rLineLambdaUpper = rMaxX - modulo(rMaxX, 100.0)
-			rLineLambdaLower = rMinX + (100- modulo(rMinX, 100.0))
 			rLineVelMax = 100.0 * rcC * (rMaxX - rLineLambda)/ rLineLambda
 			rLineVelMin = 100.0 * rcC * (rLineLambda - rMinX)/ rLineLambda
 			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 100.0)
@@ -792,6 +790,7 @@ program main
 			endif
 			rLineLambdaUpper = rLineLambda + (rLineLambda * rLineVelUpper / (rcC*100.0))
 			rLineLambdaLower = rLineLambda + (rLineLambda * rLineVelLower / (rcC*100.0))
+			print *,"w:",rLineLambdaLower,rLineLambdaUpper,"v:",rLineVelLower,rLineVelUpper
 
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
 							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
