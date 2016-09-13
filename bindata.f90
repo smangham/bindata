@@ -793,11 +793,11 @@ program main
 			print *,"w:",rLineLambdaLower,rLineLambdaUpper,"v:",rLineVelLower,rLineVelUpper
 
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
-							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
-							', "'//trim(r2c(rLineVelLower/2.0))//'" '//trim(r2c(rLineLambdaLower/2.0))//&
-							', "0" '//trim(r2c(rLineLambda))//&
-							', "'//trim(r2c(rLineVelUpper/2.0))//'" '//trim(r2c(rLineLambdaUpper/2.0))//&
-							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
+							', '//trim(r2c(rLineLambdaLower))//&
+							', '//trim(r2c(rLineLambdaLower/2.0))//&
+							', '//trim(r2c(rLineLambda))//&
+							', '//trim(r2c(rLineLambdaUpper/2.0))//&
+							', '//trim(r2c(rLineLambdaUpper))//&
 							', '//trim(r2c(rMaxX))//') mirror format ""'	
 		else
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
@@ -857,12 +857,12 @@ program main
 			cTicks = "%+.1t*10^%1T"
 			write(iFileOut,'(A)')'set xlabel "Velocity (km/s)"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
-							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
-							', "'//trim(r2c(rLineVelLower/2.0))//'" '//trim(r2c(rLineLambdaLower/2.0))//&
+							', "'//trim(r2cShort(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
+							', "'//trim(r2cShort(rLineVelLower/2.0))//'" '//trim(r2c(rLineLambdaLower/2.0))//&
 							', "0" '//trim(r2c(rLineLambda))//&
-							', "'//trim(r2c(rLineVelUpper/2.0))//'" '//trim(r2c(rLineLambdaUpper/2.0))//&
-							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
-							', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)
+							', "'//trim(r2cShort(rLineVelUpper/2.0))//'" '//trim(r2c(rLineLambdaUpper/2.0))//&
+							', "'//trim(r2cShort(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
+							', '//trim(r2c(rMaxX))//') mirror format ""'
 		else
 			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
@@ -1037,6 +1037,12 @@ contains
 		real(iKindDP), intent(in) :: rIn
 		write(r2c,'(ES12.5)')rIn
 		r2c=adjustl(r2c)
+	end function
+
+	character(len=32) function r2cShort(rIn)
+		real(iKindDP), intent(in) :: rIn
+		write(r2cShort,'(ES6.1e1)')rIn
+		r2cShort=adjustl(r2cShort)
 	end function
 
 	integer function ifLookupIndex(arBin, rVal)
