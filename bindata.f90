@@ -780,16 +780,16 @@ program main
 		write(iFileOut,'(A)')'set yrange ['//trim(r2c(rMinY))//':'//trim(r2c(rMaxY))//']'
 
 		if(bLineVel)then
-			rLineVelMax = (rcC/100.0) * (rMaxX - rLineLambda)/rLineLambda
-			rLineVelMin = (rcC/100.0) * (rMinX - rLineLambda)/rLineLambda
-			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 1000.0)
-			if(modulo(rLineVelMin,1000.0)>0)then
-				rLineVelLower = rLineVelMin + (1000.0 - modulo(rLineVelMin, 1000.0))
+			rLineVelMax = (rcC/1e5) * (rMaxX - rLineLambda)/rLineLambda
+			rLineVelMin = (rcC/1e5) * (rMinX - rLineLambda)/rLineLambda
+			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 100.0)
+			if(modulo(rLineVelMin,100.0)>0)then
+				rLineVelLower = rLineVelMin + (100.0 - modulo(rLineVelMin, 100.0))
 			else
 				rLineVelLower = rLineVelMin
 			endif
-			rLineLambdaUpper = rLineLambda + (rLineLambda * rLineVelUpper / (rcC/100.0))
-			rLineLambdaLower = rLineLambda + (rLineLambda * rLineVelLower / (rcC/100.0))
+			rLineLambdaUpper = rLineLambda + (rLineLambda * rLineVelUpper / (rcC/1e5))
+			rLineLambdaLower = rLineLambda + (rLineLambda * rLineVelLower / (rcC/1e5))
 			print *,"w:",rLineLambdaLower,rLineLambdaUpper,"v:",rLineVelLower,rLineVelUpper
 
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
@@ -852,6 +852,7 @@ program main
 		if(bNoTicks)then
 			continue
 		elseif(bLineVel)then
+			write(iFileOut,'(A)')'set xlabel "Velocity (km/s)"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
 							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
 							', "0" '//trim(r2c(rLineLambda))//&
