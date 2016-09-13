@@ -46,7 +46,7 @@ program main
 	logical 			:: bLineMode=.FALSE., bLineFound=.FALSE., bLineBHEstimate=.FALSE., bLineBHUseRMS=.FALSE.
 	integer				:: iLines=0, iNRes
 	integer, allocatable 		:: aiLine(:)
-	real(iKindDP)		:: rLineLambda, rLineLambdaUpper, rLineLambdaLower, rLineVelUpper, rLineVelLower, rLineVelMax, rLineVelMin
+	real(iKindDP)		:: rLineLambda, rLineLambdaU2, rLineLambdaU1, rLineLambdaL1, rLineLambdaL2, rLineVelUpper, rLineVelLower, rLineVelMax, rLineVelMin
 	logical 			:: bLineVel=.FALSE.
 
 	!Error tracking variables
@@ -784,21 +784,22 @@ program main
 			rLineVelMin = (rcC/1e5) * (rMinX - rLineLambda)/rLineLambda
 			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 1000.0)
 			if(modulo(rLineVelMin,1000.0)>0)then
-				rLineVelLower = rLineVelMin + (1000.0 - modulo(rLineVelMin, 100.0))
+				rLineVelLower = rLineVelMin + (1000.0 - modulo(rLineVelMin, 1000.0))
 			else
 				rLineVelLower = rLineVelMin
 			endif
-			rLineLambdaUpper = rLineLambda + (rLineLambda * rLineVelUpper / (rcC/1e5))
-			rLineLambdaLower = rLineLambda + (rLineLambda * rLineVelLower / (rcC/1e5))
-			print *,"w:",rLineLambdaLower,rLineLambdaLower/2.0,0,rLineLambdaUpper/2.0,rLineLambdaUpper,"v:",rLineVelLower,rLineVelUpper
+			rLineLambdaU2 = rLineLambda + (rLineLambda *  rLineVelUpper      / (rcC/1e5))
+			rLineLambdaU1 = rLineLambda + (rLineLambda * (rLineVelUpper/2.0) / (rcC/1e5))
+			rLineLambdaL1 = rLineLambda + (rLineLambda * (rLineVelLower/2.0) / (rcC/1e5))
+			rLineLambdaL2 = rLineLambda + (rLineLambda *  rLineVelLower      / (rcC/1e5))
 
-			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
-							', '//trim(r2c(rLineLambdaLower))//&
-							', '//trim(r2c(rLineLambdaLower/2.0))//&
+			write(iFileOut,'(A)')'set xtics ('//&
+							', '//trim(r2c(rLineLambdaL2))//&
+							', '//trim(r2c(rLineLambdaL1))//&
 							', '//trim(r2c(rLineLambda))//&
-							', '//trim(r2c(rLineLambdaUpper/2.0))//&
-							', '//trim(r2c(rLineLambdaUpper))//&
-							', '//trim(r2c(rMaxX))//') mirror format ""'	
+							', '//trim(r2c(rLineLambdaU1))//&
+							', '//trim(r2c(rLineLambdaU2))//&
+							') mirror format ""'	
 		else
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
 							', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
@@ -856,13 +857,13 @@ program main
 		elseif(bLineVel)then
 			cTicks = "%+.1t*10^%1T"
 			write(iFileOut,'(A)')'set xlabel "Velocity (km/s)"'
-			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
-							', "'//trim(r2cShort(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
-							', "'//trim(r2cShort(rLineVelLower/2.0))//'" '//trim(r2c(rLineLambdaLower/2.0))//&
+			write(iFileOut,'(A)')'set xtics ('//&
+							', "'//trim(r2cShort(rLineVelLower))//'" '//trim(r2c(rLineLambdaL2))//&
+							', "'//trim(r2cShort(rLineVelLower/2.0))//'" '//trim(r2c(rLineLambdaL1))//&
 							', "0" '//trim(r2c(rLineLambda))//&
-							', "'//trim(r2cShort(rLineVelUpper/2.0))//'" '//trim(r2c(rLineLambdaUpper/2.0))//&
-							', "'//trim(r2cShort(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
-							', '//trim(r2c(rMaxX))//') mirror format ""'
+							', "'//trim(r2cShort(rLineVelUpper/2.0))//'" '//trim(r2c(rLineLambdaU1))//&
+							', "'//trim(r2cShort(rLineVelUpper))//'" '//trim(r2c(rLineLambdaU2))//&
+							') mirror format ""'
 		else
 			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
