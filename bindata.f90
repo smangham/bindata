@@ -794,9 +794,9 @@ program main
 
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
 							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
-							', "'//trim(r2c(rLineVelLower/2))//'" '//trim(r2c(rLineLambdaLower/2))//&
+							', "'//trim(r2c(rLineVelLower/2.0))//'" '//trim(r2c(rLineLambdaLower/2.0))//&
 							', "0" '//trim(r2c(rLineLambda))//&
-							', "'//trim(r2c(rLineVelUpper/2))//'" '//trim(r2c(rLineLambdaUpper/2))//&
+							', "'//trim(r2c(rLineVelUpper/2.0))//'" '//trim(r2c(rLineLambdaUpper/2.0))//&
 							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
 							', '//trim(r2c(rMaxX))//') mirror format ""'	
 		else
@@ -854,12 +854,13 @@ program main
 		if(bNoTicks)then
 			continue
 		elseif(bLineVel)then
+			cTicks = "%+.1t*10^%1T"
 			write(iFileOut,'(A)')'set xlabel "Velocity (km/s)"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
 							', "'//trim(r2c(rLineVelLower))//'" '//trim(r2c(rLineLambdaLower))//&
-							', "'//trim(r2c(rLineVelLower/2))//'" '//trim(r2c(rLineLambdaLower/2))//&
+							', "'//trim(r2c(rLineVelLower/2.0))//'" '//trim(r2c(rLineLambdaLower/2.0))//&
 							', "0" '//trim(r2c(rLineLambda))//&
-							', "'//trim(r2c(rLineVelUpper/2))//'" '//trim(r2c(rLineLambdaUpper/2))//&
+							', "'//trim(r2c(rLineVelUpper/2.0))//'" '//trim(r2c(rLineLambdaUpper/2.0))//&
 							', "'//trim(r2c(rLineVelUpper))//'" '//trim(r2c(rLineLambdaUpper))//&
 							', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)
 		else
