@@ -790,7 +790,7 @@ program main
 			endif
 			rLineLambdaUpper = rLineLambda + (rLineLambda * rLineVelUpper / (rcC/1e5))
 			rLineLambdaLower = rLineLambda + (rLineLambda * rLineVelLower / (rcC/1e5))
-			print *,"w:",rLineLambdaLower,rLineLambdaUpper,"v:",rLineVelLower,rLineVelUpper
+			print *,"w:",rLineLambdaLower,rLineLambdaLower/2.0,0,rLineLambdaUpper/2.0,rLineLambdaUpper,"v:",rLineVelLower,rLineVelUpper
 
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//&
 							', '//trim(r2c(rLineLambdaLower))//&
@@ -1041,7 +1041,7 @@ contains
 
 	character(len=32) function r2cShort(rIn)
 		real(iKindDP), intent(in) :: rIn
-		write(r2cShort,'(ES6.1e1)')rIn
+		write(r2cShort,'(ES7.1e1)')rIn
 		r2cShort=adjustl(r2cShort)
 	end function
 
