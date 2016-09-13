@@ -794,7 +794,7 @@ program main
 			rLineLambdaL2 = rLineLambda + (rLineLambda *  rLineVelLower      / (rcC/1e5))
 
 			write(iFileOut,'(A)')'set xtics ('//&
-							', '//trim(r2c(rLineLambdaL2))//&
+							      trim(r2c(rLineLambdaL2))//&
 							', '//trim(r2c(rLineLambdaL1))//&
 							', '//trim(r2c(rLineLambda))//&
 							', '//trim(r2c(rLineLambdaU1))//&
@@ -858,7 +858,7 @@ program main
 			cTicks = "%+.1t*10^%1T"
 			write(iFileOut,'(A)')'set xlabel "Velocity (km/s)"'
 			write(iFileOut,'(A)')'set xtics ('//&
-							', "'//trim(r2cShort(rLineVelLower))//'" '//trim(r2c(rLineLambdaL2))//&
+							       trim(r2cShort(rLineVelLower))//'" '//trim(r2c(rLineLambdaL2))//&
 							', "'//trim(r2cShort(rLineVelLower/2.0))//'" '//trim(r2c(rLineLambdaL1))//&
 							', "0" '//trim(r2c(rLineLambda))//&
 							', "'//trim(r2cShort(rLineVelUpper/2.0))//'" '//trim(r2c(rLineLambdaU1))//&
