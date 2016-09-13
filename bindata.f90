@@ -781,10 +781,10 @@ program main
 
 		if(bLineVel)then
 			rLineVelMax = (rcC/100.0) * (rMaxX - rLineLambda)/rLineLambda
-			rLineVelMin = (rcC/100.0) * (rLineLambda - rMinX)/rLineLambda
+			rLineVelMin = (rcC/100.0) * (rMinX - rLineLambda)/rLineLambda
 			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 1000.0)
-			if(modulo(rLineVelMax,100.0)>0)then
-				rLineVelLower = rLineVelMin + (100 - modulo(rLineVelMax, 1000.0))
+			if(modulo(rLineVelMin,1000.0)>0)then
+				rLineVelLower = rLineVelMin + (1000.0 - modulo(rLineVelMin, 1000.0))
 			else
 				rLineVelLower = rLineVelMin
 			endif
