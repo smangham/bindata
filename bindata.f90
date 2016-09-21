@@ -855,7 +855,6 @@ program main
 		if(bNoTicks)then
 			continue
 		elseif(bLineVel)then
-			cTicks = "%.1t*10^%1T"
 			write(iFileOut,'(A)')'set xlabel "Velocity (km/s)"'
 			write(iFileOut,'(A)')'set xtics ('//&
 							 ' "'//trim(r2cShort(rLineVelLower))//'" '//trim(r2c(rLineLambdaL2))//&
@@ -868,7 +867,7 @@ program main
 			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
 							', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
-							', '//trim(r2c(rMaxX))//') mirror format '//trim(cTicks)
+							', '//trim(r2c(rMaxX))//') mirror format '//'"%.1t*10^%1T"'
 		endif
 
 		write(iFileOut,'(A)')'set ytics autofreq format ""'
