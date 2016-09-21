@@ -855,7 +855,7 @@ program main
 		if(bNoTicks)then
 			continue
 		elseif(bLineVel)then
-			cTicks = "%+.1t*10^%1T"
+			cTicks = "%.1t*10^%1T"
 			write(iFileOut,'(A)')'set xlabel "Velocity (km/s)"'
 			write(iFileOut,'(A)')'set xtics ('//&
 							 ' "'//trim(r2cShort(rLineVelLower))//'" '//trim(r2c(rLineLambdaL2))//&
