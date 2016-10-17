@@ -769,7 +769,7 @@ program main
 			write(iFileOut,'(A)')'set log cb'
 		endif
 		write(iFileOut,'(A)')'set colorbox user origin 0.65,0.05 size .05,0.3'
-		write(iFileOut,'(A)')'set cblabel "Photon rate (photons/s^{-1})"'
+		write(iFileOut,'(A)')'set cblabel "Photon rate (photons s^{-1})"'
 		if(bNoKey.OR.bPointwiseOnly)then
 			write(iFileOut,'(A)')'unset colorbox'		
 		endif
