@@ -1047,7 +1047,7 @@ contains
 
 	character(len=32) function r2cDef(rIn)
 		real(iKindDP), intent(in) :: rIn
-		write(r2cDef,*)rIn
+		write(r2cDef,'(D8.1)')rIn
 		r2cDef=adjustl(r2cDef)
 	end function
 
