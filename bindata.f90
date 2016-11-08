@@ -857,11 +857,11 @@ program main
 		elseif(bLineVel)then
 			write(iFileOut,'(A)')'set xlabel "Velocity (10^{3} km/s)"'
 			write(iFileOut,'(A)')'set xtics ('//&
-							 ' "'//trim(r2cShort(rLineVelLower/1000.0))//'" '//trim(r2c(rLineLambdaL2))//&
-							', "'//trim(r2cShort(rLineVelLower/2000.0))//'" '//trim(r2c(rLineLambdaL1))//&
+							 ' "'//trim(r2cDef(rLineVelLower/1000.0))//'" '//trim(r2c(rLineLambdaL2))//&
+							', "'//trim(r2cDef(rLineVelLower/2000.0))//'" '//trim(r2c(rLineLambdaL1))//&
 							', "0" '//trim(r2c(rLineLambda))//&
-							', "'//trim(r2cShort(rLineVelUpper/2000.0))//'" '//trim(r2c(rLineLambdaU1))//&
-							', "'//trim(r2cShort(rLineVelUpper/1000.0))//'" '//trim(r2c(rLineLambdaU2))//&
+							', "'//trim(r2cDef(rLineVelUpper/2000.0))//'" '//trim(r2c(rLineLambdaU1))//&
+							', "'//trim(r2cDef(rLineVelUpper/1000.0))//'" '//trim(r2c(rLineLambdaU2))//&
 							') mirror format ""'
 		else
 			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
@@ -1043,6 +1043,12 @@ contains
 		real(iKindDP), intent(in) :: rIn
 		write(r2cShort,'(ES7.1e1)')rIn
 		r2cShort=adjustl(r2cShort)
+	end function
+
+	character(len=32) function r2cDef(rIn)
+		real(iKindDP), intent(in) :: rIn
+		write(r2cDef,*)rIn
+		r2cDef=adjustl(r2cDef)
 	end function
 
 	integer function ifLookupIndex(arBin, rVal)
