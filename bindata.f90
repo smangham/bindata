@@ -533,7 +533,7 @@ program main
 			read(iFileIn,'(A512)',iostat=iEOF) cBuffer
 			if(cBuffer(1:1).NE."#")then
 				read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
-											iNScat, iNRScat, rDelay, iObserver, iOrigin, iNRes
+											iNScat, iNRScat, rDelay, iDummy, iObserver, iOrigin, iNRes
 
 				if(iErr.GT.0)then
 					iErr=0
@@ -587,7 +587,7 @@ program main
 		if(cBuffer(1:1).NE."#")then
 			iPhot=iPhot+1
 			read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
-										iNScat, iNRScat, rDelay, iObserver, iOrigin, iNRes
+										iNScat, iNRScat, rDelay, iDummy, iObserver, iOrigin, iNRes
 			iNCScat = iNScat - iNRScat
 
 			!If we're in line mode, check to see if this photon's origin line is in the list of tracked lines
@@ -855,13 +855,13 @@ program main
 		if(bNoTicks)then
 			continue
 		elseif(bLineVel)then
-			write(iFileOut,'(A)')'set xlabel "Velocity (km/s)"'
+			write(iFileOut,'(A)')'set xlabel "Velocity (10^{3} km/s)"'
 			write(iFileOut,'(A)')'set xtics ('//&
-							 ' "'//trim(r2cShort(rLineVelLower))//'" '//trim(r2c(rLineLambdaL2))//&
-							', "'//trim(r2cShort(rLineVelLower/2.0))//'" '//trim(r2c(rLineLambdaL1))//&
+							 ' "'//trim(r2cShort(rLineVelLower/1000.0))//'" '//trim(r2c(rLineLambdaL2))//&
+							', "'//trim(r2cShort(rLineVelLower/2000.0))//'" '//trim(r2c(rLineLambdaL1))//&
 							', "0" '//trim(r2c(rLineLambda))//&
-							', "'//trim(r2cShort(rLineVelUpper/2.0))//'" '//trim(r2c(rLineLambdaU1))//&
-							', "'//trim(r2cShort(rLineVelUpper))//'" '//trim(r2c(rLineLambdaU2))//&
+							', "'//trim(r2cShort(rLineVelUpper/2000.0))//'" '//trim(r2c(rLineLambdaU1))//&
+							', "'//trim(r2cShort(rLineVelUpper/1000.0))//'" '//trim(r2c(rLineLambdaU2))//&
 							') mirror format ""'
 		else
 			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
