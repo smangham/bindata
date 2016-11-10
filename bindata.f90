@@ -18,7 +18,7 @@ program main
 	integer				:: iArg=1, iArg_iter
 	integer 			:: iObserver, iObserverMin=0, iObserverMax=0, iObservers=1, iObs
 	integer, allocatable			:: aiMap(:,:,:),aiMapX(:,:),aiMapY(:,:),aiMapR(:)
-	real(iKindDP), allocatable		:: arMap(:,:,:),arMapX(:,:),arMapY(:,:),arBinX(:),arBinY(:)
+	real(iKindDP), allocatable		:: arMap(:,:,:),arMapX(:,:),arMapY(:,:),arBinX(:),arBinY(:), arNormalise(:)
 	real(iKindDP)		:: rDummy, rLambda, rWeight, rDelay, rPosX,rPosY,rPosZ,rErr
 	real(iKindDP)		:: rMinX=-1., rMaxX=-1., rMinY=-1., rMaxY=-1., rRngX=-1., rRngY=-1., rMinR=-1.,rMaxR=-1., rRngR=-1.
 	real(iKindDP)		:: rMinP=1e300_iKindDP, rMaxP=0.,rMinI=1e300_iKindDP,rMaxI=0.,rRad=-1, rTemp=0.0
@@ -471,7 +471,7 @@ program main
 	allocate(aiMapR(iDimR), aiMap(iDimX,iDimY,iObserverMin:iObserverMax))
 	allocate(arMapX(iDimX,iObserverMin:iObserverMax), arMapY(iDimY,iObserverMin:iObserverMax))
 	allocate(arMapR(iDimR), arMap(iDimX,iDimY,iObserverMin:iObserverMax))
-	allocate(arBinX(iDimX+1), arBinY(iDimY+1))
+	allocate(arBinX(iDimX+1), arBinY(iDimY+1), arNormalise(iObserverMin:iObserverMax))
 
 	do i=0,iDimX
 		arBinX(i+1)=rMinX+i*(rMaxX-rMinX)/real(iDimX)
@@ -487,6 +487,8 @@ program main
 	arMap=0.0
 	arMapX=0.0
 	arMapY=0.0
+
+	arNormalise=0.0
 
 !	============================================================================
 !	REWEIGHTING SECTION
@@ -652,6 +654,7 @@ program main
 							arMapX(iBinX,iObserver) 		= arMapX(iBinX,iObserver) + rWeight
 							aiMapY(iBinY,iObserver) 		= aiMapY(iBinY,iObserver) + 1
 							arMapY(iBinY,iObserver) 		= arMapY(iBinY,iObserver) + rWeight
+							arNormalise(iObserver)  		= arNormalise(iObserver)  + rWeight
 						else
 							iErrWeight=iErrWeight+1
 							if(iErrWeight.LT.10)then
@@ -668,6 +671,7 @@ program main
 						arMapX(iBinX,iObserver) = 		arMapX(iBinX,iObserver) + rWeight
 						aiMapY(iBinY,iObserver) = 		aiMapY(iBinY,iObserver) + 1
 						arMapY(iBinY,iObserver) = 		arMapY(iBinY,iObserver) + rWeight
+						arNormalise(iObserver)  = 		arNormalise(iObserver)  + rWeight
 					endif
 
 				endif
@@ -686,6 +690,8 @@ program main
 		STOP
 	endif
 
+
+
 	!For each observer, output a plot
 	do iObs=iObserverMin,iObserverMax
 		!If there is only one observer, don't bother adding the name
@@ -694,6 +700,9 @@ program main
 		else
 			print '(A)','Writing to "'//trim(cFileOut)//'.eps"'
 		endif
+
+		!Normalise the results
+		arMap(:,:,iObs) = arMap(:,:,iObs)/arNormalise(iObs)
 
 		!If we are tracking a single line to find the mass
 		if(bLineMode.AND.iLines.EQ.1)then
@@ -769,7 +778,6 @@ program main
 			write(iFileOut,'(A)')'set log cb'
 		endif
 		write(iFileOut,'(A)')'set colorbox user origin 0.65,0.05 size .05,0.3'
-		write(iFileOut,'(A)')'set cblabel "Photon rate (photons s^{-1})"'
 		if(bNoKey.OR.bPointwiseOnly)then
 			write(iFileOut,'(A)')'unset colorbox'		
 		endif
@@ -816,6 +824,12 @@ program main
 		if(bChangeCB)then
 			write(iFileOut,'(A)')'set cbrange ['//trim(r2c(rMinCB))//':'//trim(r2c(rMaxCB))//']'
 		endif
+		if(bLineVel)then
+			write(iFileOut,'(A)')'set cblabel "{/Symbol j}(v, {\Symbol t})"'
+		else
+			write(iFileOut,'(A)')'set cblabel "{/Symbol j}({\Symbol n}, {\Symbol t})"'
+		endif
+
 		if(bPointwiseOnly)then
 			write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_XYp" u 1:4:2:3:5:6 w xyerrorbars notitle'
 		elseif(bPointwise)then
@@ -853,7 +867,6 @@ program main
 		write(iFileOut,'(A)')'set yrange [*:*]'
 
 		if(bNoTicks)then
-			continue
 		elseif(bLineVel)then
 			write(iFileOut,'(A)')'set xlabel "Velocity (10^{3} km/s)"'
 			write(iFileOut,'(A)')'set xtics ('//&
@@ -864,6 +877,7 @@ program main
 							', "'//trim(r2cDef(rLineVelUpper/1000.0))//'" '//trim(r2c(rLineLambdaU2))//&
 							') mirror format ""'
 		else
+			write(iFileOut,'(A)')'set cblabel "Normalised transfer function {/Symbol j}({\Symbol n}, {\Symbol t})"'
 			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
 							', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
@@ -1047,7 +1061,7 @@ contains
 
 	character(len=32) function r2cDef(rIn)
 		real(iKindDP), intent(in) :: rIn
-		write(r2cDef,'(D8.1)')rIn
+		write(r2cDef,'(F8.1)')rIn
 		r2cDef=adjustl(r2cDef)
 	end function
 
