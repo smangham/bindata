@@ -678,6 +678,7 @@ program main
 			endif
 		endif
 	end do
+	print *,"DEBUG: Closing file"
 	close(iFileIn)
 
 	if(iErrLog.GT.0) print '(X,A,I0,A)',"WARNING: ",iErrLog," points lay outside the map range."
@@ -691,7 +692,6 @@ program main
 	endif
 
 
-
 	!For each observer, output a plot
 	do iObs=iObserverMin,iObserverMax
 		!If there is only one observer, don't bother adding the name
@@ -701,8 +701,12 @@ program main
 			print '(A)','Writing to "'//trim(cFileOut)//'.eps"'
 		endif
 
+		print *,"DEBUG PRE NORMAL"
+
 		!Normalise the results
 		arMap(:,:,iObs) = arMap(:,:,iObs)/arNormalise(iObs)
+
+		print *,"DEBUG POST NORMAL"
 
 		!If we are tracking a single line to find the mass
 		if(bLineMode.AND.iLines.EQ.1)then
@@ -766,7 +770,7 @@ program main
 		close(iFileOut)
 
 		open(iFileOut,file=trim(cFileOut)//".plot",status="REPLACE",action="WRITE")
-		write(iFileOut,'(A)')'set term postscript eps color enhanced'
+		write(iFileOut,'(A)')'set term postscript eps color enhanced font "Times-New-Roman,18"'
 		if(iObservers.GT.1)then
 			write(iFileOut,'(A,I0,A)')'set output "'//trim(cFileOut)//'.',iObs,'.eps"'
 		else
@@ -825,9 +829,9 @@ program main
 			write(iFileOut,'(A)')'set cbrange ['//trim(r2c(rMinCB))//':'//trim(r2c(rMaxCB))//']'
 		endif
 		if(bLineVel)then
-			write(iFileOut,'(A)')'set cblabel "{/Symbol j}(v, {\Symbol t})"'
+			write(iFileOut,'(A)')'set cblabel "Log {/Symbol j}(v, {\Symbol t})" font ",22"'
 		else
-			write(iFileOut,'(A)')'set cblabel "{/Symbol j}({\Symbol n}, {\Symbol t})"'
+			write(iFileOut,'(A)')'set cblabel "Log {/Symbol j}({\Symbol n}, {/Symbol t})" font ",24" offset 1,0'
 		endif
 
 		if(bPointwiseOnly)then
@@ -857,7 +861,7 @@ program main
 		write(iFileOut,'(A)')'set y2tics ('//trim(r2c(rMinY))//', '//trim(r2c(rMinY+.25*rRngY))//&
 						', '//trim(r2c(rMinY+.5*rRngY))//', '//trim(r2c(rMinY+.75*rRngY))//&
 						', '//trim(r2c(rMaxY))//') mirror format '//trim(cTicks)
-		if(.NOT.bNoTicks)write(iFileOut,'(A)')'set y2label "Delay (days)"'
+		if(.NOT.bNoTicks)write(iFileOut,'(A)')'set y2label "Delay {/Symbol t} (days)" format ".1f" font ",22"'
 
 		write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_Y" u 2:1 w l notitle'
 
@@ -868,7 +872,7 @@ program main
 
 		if(bNoTicks)then
 		elseif(bLineVel)then
-			write(iFileOut,'(A)')'set xlabel "Velocity (10^{3} km/s)"'
+			write(iFileOut,'(A)')'set xlabel "Velocity (10^{3} km s^{-1})" font ",22"'
 			write(iFileOut,'(A)')'set xtics ('//&
 							 ' "'//trim(r2cDef(rLineVelLower/1000.0))//'" '//trim(r2c(rLineLambdaL2))//&
 							', "'//trim(r2cDef(rLineVelLower/2000.0))//'" '//trim(r2c(rLineLambdaL1))//&
@@ -877,8 +881,7 @@ program main
 							', "'//trim(r2cDef(rLineVelUpper/1000.0))//'" '//trim(r2c(rLineLambdaU2))//&
 							') mirror format ""'
 		else
-			write(iFileOut,'(A)')'set cblabel "Normalised transfer function {/Symbol j}({\Symbol n}, {\Symbol t})"'
-			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)"'
+			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)" font ",22"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
 							', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
 							', '//trim(r2c(rMaxX))//') mirror format '//'"%.1t*10^%1T"'
