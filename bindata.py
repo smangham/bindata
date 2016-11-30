@@ -132,9 +132,9 @@ class TransferFunction(Query):
         return(self._count[np.searchsorted(self._bins_delay, delay),
                            np.searchsorted(self._bins_wave, wave)])
 
-    def plot(self, range=4):
+    def plot(self, log_range=5):
         cb_max = np.log10(np.amax(self._flux))
-        cb_min = np.log10(np.amax(self._flux))-range
+        cb_min = np.log10(np.amax(self._flux))-log_range
         print(cb_min, cb_max)
         
         fig = plt.figure()
@@ -146,7 +146,7 @@ class TransferFunction(Query):
         cbar = plt.colorbar(tf, orientation="vertical")
         fig.show()
 
-s_root = "test"
+s_root = "ngc5548_1e00_obs_2"
 s_file_db = s_root+".db"
 s_file_dd = s_root+".delay_dump"
 
@@ -208,5 +208,9 @@ print("Query took {:.2f} seconds".format(time.clock()-start))
 start = time.clock()
 tf_a = TransferFunction(dbc, [50,50], 0).in_range("Wavelength", 1450, 1650).run()
 print("TF took {:.2f} seconds".format(time.clock()-start))
+start = time.clock()
+tf_b = TransferFunction(dbc, [50,50], 0).in_range("Wavelength", 1450, 1650).in_list("Resonance",[381,416]).run()
+print("TF took {:.2f} seconds".format(time.clock()-start))
 tf_a.plot()
+tf_b.plot()
 db.close()
