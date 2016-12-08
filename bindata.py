@@ -4,12 +4,13 @@ Spyder Editor
 
 This is a temporary script file.
 """
-import sqlite3
+#import sqlite3 as sql
 import numpy as np
 import astropy as ap
 import time
 import sys
 import matplotlib.pyplot as plt
+import MySQLdb as sql
 
 class Query(object):
     def __init__(self, dbc, spectrum):
@@ -161,8 +162,8 @@ as_names = ["Frequency", "Wavelength", "Weight", "X", "Y", "Z", "Scatters", "Res
 ### TRY OPENING THE DATABASE ###
 db = None
 try:
-    db = sqlite3.connect(s_file_db)
-except sqlite3.Error as e:
+    db = sql.connect(s_file_db)
+except sql.Error as e:
     print("Error {}: ".format(e.args[0]))
     sys.exit(1)
 
@@ -182,7 +183,7 @@ else:
 
     key = 0
     delay_dump = open(s_file_dd, 'r')
-    for line in delay_dump:
+    for key, line in enumerate(delay_dump):
         if line.startswith('#'): 
             continue
         values = line.split()
@@ -196,7 +197,6 @@ else:
         values[5] = (values[5] - values[6])
         values.insert(0, key)
         dbc.execute(q_photon_add, values)
-        key = key + 1
     db.commit()
 
 print("Input took {:.2f} seconds".format(time.clock()-start))

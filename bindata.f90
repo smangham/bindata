@@ -701,12 +701,8 @@ program main
 			print '(A)','Writing to "'//trim(cFileOut)//'.eps"'
 		endif
 
-		print *,"DEBUG PRE NORMAL"
-
 		!Normalise the results
 		arMap(:,:,iObs) = arMap(:,:,iObs)/arNormalise(iObs)
-
-		print *,"DEBUG POST NORMAL"
 
 		!If we are tracking a single line to find the mass
 		if(bLineMode.AND.iLines.EQ.1)then
@@ -740,7 +736,6 @@ program main
 					write(iFileOut,'(6(ES12.5,1X))') (arBinX(i)+arBinX(i+1))/2, arBinX(i), arBinX(i+1),&
 													 rPathCent, rPathCentL, rPathCentU
 				endif
-				
 			end do
 			close(iFileOut)
 		endif
@@ -778,8 +773,9 @@ program main
 		endif
 		write(iFileOut,'(A)')'set multiplot'
 		write(iFileOut,'(A)')'set bmargin 0; set tmargin 0; set lmargin 0; set rmargin 0'
-		if(.NOT.bNoLog.AND..NOT.bPointwiseOnly)then
+		if(.NOT.bNoLog)then
 			write(iFileOut,'(A)')'set log cb'
+			write(iFileOut,'(A)')'set cbtics format "%.1T"'
 		endif
 		write(iFileOut,'(A)')'set colorbox user origin 0.65,0.05 size .05,0.3'
 		if(bNoKey.OR.bPointwiseOnly)then
@@ -827,11 +823,21 @@ program main
 		write(iFileOut,'(A)')'set palette rgb -34,-35,-36'
 		if(bChangeCB)then
 			write(iFileOut,'(A)')'set cbrange ['//trim(r2c(rMinCB))//':'//trim(r2c(rMaxCB))//']'
+		else
+			write(iFileOut,'(A)')'set cbrange [1e-7 : 1e-2]'
 		endif
 		if(bLineVel)then
-			write(iFileOut,'(A)')'set cblabel "Log {/Symbol j}(v, {\Symbol t})" font ",22"'
+			if(bNoLog)then
+				write(iFileOut,'(A)')'set cblabel "{/Symbol j}(v, {/Symbol t})" font ",24" offset 1,0'
+			else
+				write(iFileOut,'(A)')'set cblabel "Log {/Symbol j}(v, {/Symbol t})" font ",24" offset 1,0'
+			endif
 		else
-			write(iFileOut,'(A)')'set cblabel "Log {/Symbol j}({\Symbol n}, {/Symbol t})" font ",24" offset 1,0'
+			if(bNoLog)then
+				write(iFileOut,'(A)')'set cblabel "{/Symbol j}({\Symbol n}, {/Symbol t})" font ",24" offset 1,0'
+			else
+				write(iFileOut,'(A)')'set cblabel "Log {/Symbol j}({\Symbol n}, {/Symbol t})" font ",24" offset 1,0'
+			endif
 		endif
 
 		if(bPointwiseOnly)then
@@ -861,7 +867,7 @@ program main
 		write(iFileOut,'(A)')'set y2tics ('//trim(r2c(rMinY))//', '//trim(r2c(rMinY+.25*rRngY))//&
 						', '//trim(r2c(rMinY+.5*rRngY))//', '//trim(r2c(rMinY+.75*rRngY))//&
 						', '//trim(r2c(rMaxY))//') mirror format '//trim(cTicks)
-		if(.NOT.bNoTicks)write(iFileOut,'(A)')'set y2label "Delay {/Symbol t} (days)" format ".1f" font ",22"'
+		if(.NOT.bNoTicks)write(iFileOut,'(A)')'set y2label "Delay {/Symbol t} (days)" font ",22"'
 
 		write(iFileOut,'(A)')'plot "'//trim(cFileOut)//'.bin_Y" u 2:1 w l notitle'
 
