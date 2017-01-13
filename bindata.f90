@@ -68,6 +68,8 @@ program main
 	!Centroid delay variables
 	real(iKindDP)		:: rDelayCent, rDelayL, rDelayU
 
+	real(iKindDP) 		:: rRespMax
+
 	if(command_argument_count().EQ.0)then
 		print *,"DESCRIPTION:"
 		print *,"The bindata utility is intended to bin up delay dump outputs produced by PYTHON."
@@ -678,7 +680,6 @@ program main
 			endif
 		endif
 	end do
-	print *,"DEBUG: Closing file"
 	close(iFileIn)
 
 	if(iErrLog.GT.0) print '(X,A,I0,A)',"WARNING: ",iErrLog," points lay outside the map range."
@@ -702,7 +703,14 @@ program main
 		endif
 
 		!Normalise the results
-		arMap(:,:,iObs) = arMap(:,:,iObs)/arNormalise(iObs)
+		print *,"Total flux for observer: ",arNormalise(iObs)
+		rRespMax = 0
+		do i=1, iDimX
+			do j=1, iDimY
+				if(arMap(i,j,iObs).GT.rRespMax) rRespMax = arMap(i,j,iObs)
+			end do
+		end do
+		arMap(:,:,iObs) = arMap(:,:,iObs)/rRespMax
 
 		!If we are tracking a single line to find the mass
 		if(bLineMode.AND.iLines.EQ.1)then
@@ -824,7 +832,7 @@ program main
 		if(bChangeCB)then
 			write(iFileOut,'(A)')'set cbrange ['//trim(r2c(rMinCB))//':'//trim(r2c(rMaxCB))//']'
 		else
-			write(iFileOut,'(A)')'set cbrange [1e-7 : 1e-2]'
+			write(iFileOut,'(A)')'set cbrange [1e-5 : 1]'
 		endif
 		if(bLineVel)then
 			if(bNoLog)then
@@ -834,9 +842,9 @@ program main
 			endif
 		else
 			if(bNoLog)then
-				write(iFileOut,'(A)')'set cblabel "{/Symbol j}({\Symbol n}, {/Symbol t})" font ",24" offset 1,0'
+				write(iFileOut,'(A)')'set cblabel "{/Symbol j}({/Symbol n}, {/Symbol t})" font ",24" offset 1,0'
 			else
-				write(iFileOut,'(A)')'set cblabel "Log {/Symbol j}({\Symbol n}, {/Symbol t})" font ",24" offset 1,0'
+				write(iFileOut,'(A)')'set cblabel "Log {/Symbol j}({/Symbol n}, {/Symbol t})" font ",24" offset 1,0'
 			endif
 		endif
 
@@ -890,7 +898,7 @@ program main
 			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)" font ",22"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
 							', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
-							', '//trim(r2c(rMaxX))//') mirror format '//'"%.1t*10^%1T"'
+							', '//trim(r2c(rMaxX))//') mirror format '//'"%.0f"'
 		endif
 
 		write(iFileOut,'(A)')'set ytics autofreq format ""'
