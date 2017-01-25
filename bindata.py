@@ -4,7 +4,7 @@ Spyder Editor
 
 This is a temporary script file.
 """
-#import sqlite3 as sql
+import HDFql
 import numpy as np
 import astropy as ap
 import astropy.units
