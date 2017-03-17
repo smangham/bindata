@@ -132,15 +132,48 @@ class ResponseMap:
 
 # ==============================================================================       
 class TransferFunction:    
-    def __init__(self, query, filename, delay_dynamic_range=2.0, ionising_luminosity=None, dimensions=None, template=None):
+	# # FAKE INIT
+	# def __init(database, ):
+	# 	self._query = database.query(Photon.Wavelength, Photon.Delay, Photon.Weight, Photon.X, Photon.Z)
+
+	# def line(wavelength, number):
+	# 	self._line_wave = wavelength
+	# 	self._query = self._query.filter(Photon.Resonance == number)
+	# 	return self
+	# def velocities(velocity):
+	# 	assert self._line_wave is not None,\
+	# 		"Cannot limit doppler shift around a line without specifying a line!"
+	# 	self._query = self._query.filter(Photon.Wavelength >= doppler_shift_wave(self._line_wave, -velocity), 
+	# 									 Photon.Wavelength <= doppler_shift_wave(self._line_wave,  velocity))
+	# 	return self
+	# def wavelengths(wave_min, wave_max):
+	# 	assert wave_min < wave_max,\
+	# 		"Minimum wavelength must be lower than maximum wavelength!"
+	# 	self._query = self._query.filter(Photon.Wavelength >= wave_min, Photon.Wavelength <= wave_max)
+	# 	return self
+	# def lines(line_list):
+	# 	assert len(lines) > 1,\
+	# 		"For a single line, use the 'line()' filter rather than 'lines()'!"
+	# 	self._query = self._query.filter(Photon.Resonance.in_(line_list))
+	# 	return self
+	# def delays(delay_min, delay_max, unit='d'):
+	# 	assert delay_min > delay_max,\
+	# 		"Minimum delay must be below maximum delay!"
+	# 	if unit is in ['d','D','day','Day','days','Days']:
+	# 		self._query=self._query.filter(Photon.Delay > delay_min*seconds_per_day, Photon.Delay < delay_max*seconds_per_day)
+	# 	else:
+	# 		self._query=self._query.filter(Photon.Delay > delay_min, Photon.Delay < delay_max)
+	# 	return self
+
+    def __init__(self, query, filename, continuum_luminosity=None, dimensions=None, template=None):
         """Initialises the TF, taking the query it is to execute, the dimensions to bin by, and the delay range bins"""
         assert dimensions is not None or template is not None,\
             "Must provide either dimensions or another TF to copy them from!"
         
         self._query = query
         self._line_wave = None
-        self._delay_range = 1 - (10**(-delay_dynamic_range))
-        self._ionising_luminosity=ionising_luminosity
+        self._delay_range = None
+        self.continuum_luminosity=continuum_luminosity
         self._filename = filename
         self._dimensions = dimensions
         self._bins_vel = None
@@ -165,7 +198,7 @@ class TransferFunction:
         return self
 
     def response_map_by_tf(self, low_state, high_state, plot=False):
-        """Creates a responsivity map from two other transfer functions, to be applied during plotting"""
+        """Creates a response map from two other transfer functions, to be applied during plotting"""
         # The other two TFs ***must*** have identical bins and both provide ionising luminosity information
         assert self._flux is not None,\
             "You must run the TF query with '.run()' before response mapping it!"
@@ -177,40 +210,39 @@ class TransferFunction:
             "Low state TF is binned differently to target TF! Cannot rescale using it."
         assert np.array_equal(self._bins_wave, high_state._bins_wave) and np.array_equal(self._bins_delay, high_state._bins_delay),\
             "High state TF is binned differently to target TF! Cannot rescale using it."
-        assert self._ionising_luminosity != None,\
+        assert self.continuum_luminosity != None,\
             "TF missing ionising luminosity information!"
-        assert low_state._ionising_luminosity != None,\
+        assert low_state.continuum_luminosity != None,\
             "Low state TF missing ionising luminosity information!"
-        assert high_state._ionising_luminosity != None,\
+        assert high_state.continuum_luminosity != None,\
             "High state TF missing ionising luminosity information!"
-        assert low_state._ionising_luminosity < self._ionising_luminosity,\
+        assert low_state.continuum_luminosity < self.continuum_luminosity,\
             "Low state ionising luminosity greater than target TF ionising luminosity!"
-        assert high_state._ionising_luminosity > self._ionising_luminosity,\
+        assert high_state.continuum_luminosity > self.continuum_luminosity,\
             "High state ionising luminosity lower than target TF ionising luminosity!"
 
         # If that is true, the map is trivial to construct. We divide the difference in TFs by the luminosity difference
-        luminosity_difference = high_state._ionising_luminosity - low_state._ionising_luminosity
+        luminosity_difference = high_state.continuum_luminosity - low_state.continuum_luminosity
         response_map = (high_state._flux - low_state._flux) / luminosity_difference
-   
-        # Multiply by the response map
-        self._flux_w = np.multiply(self._flux, response_map)
         self._response_map = response_map
         return self
 
-    def run(self, response_map=None, line=None, scaling_factor=1.0):
+    def run(self, response_map=None, line=None, scaling_factor=1.0, delay_dynamic_range=2.0):
         """Performs a query on the photon DB and bins it"""
-        data = np.asarray(self._query.all())
-        assert len(data) > 0,\
-            "No records found!"
         assert response_map is None or line is not None,\
             "Passing a response map but no line information for it!"
         assert response_map is None or self._flux_w is None,\
             "A response map has already been built!"
+        assert response_map is not None,\
+            "Response mapping by location not yet implemented!"
+        data = np.asarray(self._query.all())
+        assert len(data) > 0,\
+            "No records found!"
 
         # Check if we've already got bins from another TF
         if self._bins_wave is None:
             # Data returned as Wavelength, Delay, Weight. Find min and max delays and wavelengths
-            range_delay = [0,np.percentile(data[:,1],self._delay_range*100)]
+            range_delay = [0,np.percentile(data[:,1],1 - (10**(-delay_dynamic_range))*100)]
             range_wave = [np.amin(data[:,0]), np.amax(data[:,0])] 
 
             # Now create the bins for each dimension
@@ -234,20 +266,9 @@ class TransferFunction:
                                                     bins=[self._bins_delay, self._bins_wave])
         # Scaling factor! Each spectral cycle outputs L photons. If we do 50 cycles, we want a factor of 1/50
         self._flux *= scaling_factor
+        # Scale to continuum luminosity
+        self._flux /= self._continuum_luminosity
 
-        # If we've been given a response map, keep a weighted array too
-        response_weights = np.zeros(len(data))
-        if response_map is not None:
-            for index, photon in enumerate(data):
-                x, z = response_map.index(photon[3], photon[4])
-                response_weights[index] = response_map.weight_for(line, photon[3], photon[4])
-                photon[2] *= response_map.weight_for(line, photon[3], photon[4])
-
-            self._flux_w = np.zeros(shape=self._dimensions, dtype=np.float64)
-            self._flux_w, junk, junk = np.histogram2d(data[:,1], data[:,0], 
-                                                        weights=data[:,2], 
-                                                        bins=[self._bins_delay, self._bins_wave])       
-            self._flux_w *= scaling_factor
         return self
         
     def flux(self, wave, delay):
@@ -260,7 +281,7 @@ class TransferFunction:
                            np.searchsorted(self._bins_wave, wave)])
 
     def plot(self, log=False, dynamic_range=3, normalised=False, rescaled=False, velocity=False, name=None, days=True, 
-            response=False, response_map_only=False, keplerian=None):
+            response=False, response_map=False, keplerian=None):
         """Takes the data gathered by calling 'run' and outputs a plot"""
         assert response_map_only is False or response is False,\
             "Cannot plot a response function *and* the response map!"
@@ -287,7 +308,6 @@ class TransferFunction:
             gridspec_kw={'width_ratios':[3,1], 'height_ratios':[1,3]})
         fig.subplots_adjust(hspace=0, wspace=0)
 
-
         # Set the properties that depend on log and wave/velocity status
         cb_label = r"$\psi_{em}$"
         cb_label_vars = r""
@@ -309,9 +329,6 @@ class TransferFunction:
         # Set the xlabel and colour bar label - these differ if velocity or not
         x_bin_mult = 1
         if velocity:
-            data_plot = np.fliplr(data_plot)
-            if response:
-                data_plot_w = np.fliplr(data_plot_w)
             oom = np.log10(np.amax(self._bins_vel))
             oom = oom - oom%3
             # We're rescaling the axis to e.g. 10^3 km/s but the colorbar is still in km/s
@@ -320,12 +337,12 @@ class TransferFunction:
             x_bin_mult = 10**oom
             ax_tf.set_xlabel(r'Velocity ($10^{:.0f}$ km s$^{}$)'.format(oom, '{-1}'))
             cb_label_vars = r"($v, \tau$)"
-            cb_label_units = r" erg s$^{-1}$ / km s$^{-1}$"
+            cb_label_units = r"/ km s$^{-1}$"
         else:
             bins_x = self._bins_wave
             ax_tf.set_xlabel(r'Wavelength $\lambda$ ($\AA$)')
             cb_label_vars += r"($\lambda, \tau$)"
-            cb_label_units = r" erg s$^{-1}$ / $\AA$"
+            cb_label_units = r"$\AA$"
 
         bins_x_midp = np.zeros(shape=self._dimensions[0])
         for i in range(0,self._dimensions[0]):
@@ -335,7 +352,7 @@ class TransferFunction:
         if days:
             bins_y = np.true_divide(self._bins_delay, float(seconds_per_day))
             ax_tf.set_ylabel(r'Delay $\tau$ (days)')
-            cb_label_units += r' day'
+            cb_label_units += r' d'
         else:
             bins_y = self._bins_delay
             ax_tf.set_ylabel(r'Delay $\tau$ (seconds)')
@@ -378,12 +395,10 @@ class TransferFunction:
             cb_label_scale = r" 10$^{}$".format(dummy)        
 
         # If this is a response function, it may have a negative component and need a different plot
-        if response or response_map_only:
+        if response or response_map:
             cb_max = np.amax([cb_max, np.abs(cb_min)])
             cb_min = -cb_max
             cb_map = 'seismic'
-            if response:
-                cb_label_units += r" erg"
 
         # Normalise or rescale the data. If doing neither, put units on cb.
         if normalised:
@@ -564,8 +579,12 @@ class Photon(Base):
 
 
 sey100_engine, sey100_dbc = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100", "root", "password")
-sey095_engine, sey095_dbc = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_095", "root", "password")
-sey105_engine, sey105_dbc = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_105", "root", "password")
+sey_lo_engine, sey_lo_dbc = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
+sey_hi_engine, sey_hi_dbc = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
+
+# sey100_engine, sey100_dbc = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100", "root", "password")
+# sey095_engine, sey095_dbc = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_095", "root", "password")
+# sey105_engine, sey105_dbc = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_105", "root", "password")
 
 # sey100_engine, sey100_dbc = open_database("sey_100", "root", "password")
 # sey095_engine, sey095_dbc = open_database("sey_095", "root", "password")
@@ -576,55 +595,62 @@ c4_wave_lim = [doppler_shift_wave(1550, 12e6), doppler_shift_wave(1550, -12e6)]
 ha_wave_lim = [doppler_shift_wave(6563, 12e6), doppler_shift_wave(6563, -12e6)]
 dims = [50, 50]
 
-
-#matplotlib.rcParams.update({'figure.autolayout': True})
-
 # ------------------------------------------------------------------------------
 sey100_query_ha = sey100_dbc.query(Photon.Wavelength, Photon.Delay, Photon.Weight, Photon.X, Photon.Z)
 sey100_query_ha = sey100_query_ha.filter(and_(Photon.Wavelength > ha_wave_lim[0], Photon.Wavelength < ha_wave_lim[1]))
-sey100_query_ha = sey100_query_ha.filter(and_(Photon.Delay < (3 * seconds_per_day), Photon.Resonance == 28))
-sey100_tf_ha = TransferFunction(sey100_query_ha, "sey_100", dimensions=dims, ionising_luminosity=1.00e43).line(6563).run(scaling_factor=0.2)
+sey100_query_ha = sey100_query_ha.filter(and_(Photon.Delay < (20 * seconds_per_day), Photon.Resonance == 28))
+sey100_tf_ha = TransferFunction(sey100_query_ha, "sey_100", dimensions=dims, continuum_luminosity=1.043e44).line(6563).run(scaling_factor=0.2)
 
-sey095_query_ha = sey095_dbc.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
-sey095_query_ha = sey095_query_ha.filter(and_(Photon.Wavelength > ha_wave_lim[0], Photon.Wavelength < ha_wave_lim[1]))
-sey095_query_ha = sey095_query_ha.filter(and_(Photon.Delay < (3 * seconds_per_day), Photon.Resonance == 28))
-sey095_tf_ha = TransferFunction(sey095_query_ha, "sey_095", ionising_luminosity=0.95e43, template=sey100_tf_ha).run()
-sey095_tf_ha.plot(velocity=True, name="ha_vel")
+sey_lo_query_ha = sey_lo_dbc.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
+sey_lo_query_ha = sey_lo_query_ha.filter(and_(Photon.Wavelength > ha_wave_lim[0], Photon.Wavelength < ha_wave_lim[1]))
+sey_lo_query_ha = sey_lo_query_ha.filter(and_(Photon.Delay < (20 * seconds_per_day), Photon.Resonance == 28))
+sey_lo_tf_ha = TransferFunction(sey_lo_query_ha, "sey_090", continuum_luminosity=0.9391e44, template=sey100_tf_ha).run()
+sey_lo_tf_ha.plot(velocity=True, name="ha_vel")
 
-sey105_query_ha = sey105_dbc.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
-sey105_query_ha = sey105_query_ha.filter(and_(Photon.Wavelength > ha_wave_lim[0], Photon.Wavelength < ha_wave_lim[1]))
-sey105_query_ha = sey105_query_ha.filter(and_(Photon.Delay < (3 * seconds_per_day), Photon.Resonance == 28))
-sey105_tf_ha = TransferFunction(sey105_query_ha, "sey_105", ionising_luminosity=1.05e43, template=sey100_tf_ha).run()
+sey_hi_query_ha = sey_hi_dbc.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
+sey_hi_query_ha = sey_hi_query_ha.filter(and_(Photon.Wavelength > ha_wave_lim[0], Photon.Wavelength < ha_wave_lim[1]))
+sey_hi_query_ha = sey_hi_query_ha.filter(and_(Photon.Delay < (20 * seconds_per_day), Photon.Resonance == 28))
+sey_hi_tf_ha = TransferFunction(sey_hi_query_ha, "sey_110", continuum_luminosity=1.148e44, template=sey100_tf_ha).run()
 
-sey100_tf_ha.response_map_by_tf(sey095_tf_ha, sey105_tf_ha)
-sey100_tf_ha.plot(name="ha")
+sey100_tf_ha.response_map_by_tf(sey_lo_tf_ha, sey_hi_tf_ha)
 sey100_tf_ha.plot(velocity=True, name="ha_vel")
-sey100_tf_ha.plot(velocity=True, name="ha_vel_resp_tf", response=True)
 sey100_tf_ha.plot(velocity=True, name="ha_vel_respmap", response_map_only=True)
+
+sey100_tf_ha = TransferFunction(sey100_query_ha, "sey_100", dimensions=dims, continuum_luminosity=1.043e44).line(6563).run(scaling_factor=1/20, delay_dynamic_range=3)
+sey100_tf_ha.plot(velocity=True, name="ha_vel_long")
+sey_lo_tf_ha = TransferFunction(sey_lo_query_ha, "sey_090", continuum_luminosity=9.391e43, template=sey100_tf_ha).run(scaling_factor=1/20)
+sey_hi_tf_ha = TransferFunction(sey_hi_query_ha, "sey_110", continuum_luminosity=1.148e44, template=sey100_tf_ha).run(scaling_factor=1/20)
+sey100_tf_ha.response_map_by_tf(sey_lo_tf_ha, sey_hi_tf_ha)
+sey100_tf_ha.plot(velocity=True, name="ha_vel_long_respmap", response_map_only=True)
 
 # ------------------------------------------------------------------------------
 sey100_query_c4 = sey100_dbc.query(Photon.Wavelength, Photon.Delay, Photon.Weight, Photon.X, Photon.Z)
 sey100_query_c4 = sey100_query_c4.filter(and_(Photon.Wavelength > c4_wave_lim[0], Photon.Wavelength < c4_wave_lim[1]))
-sey100_query_c4 = sey100_query_c4.filter(and_(Photon.Delay < (3 * seconds_per_day), Photon.Resonance == 416))
-sey100_tf_c4 = TransferFunction(sey100_query_c4, "sey_100", dimensions=dims, ionising_luminosity=1.00e43).line(1550).run(scaling_factor=0.2)
-
-sey095_query_c4 = sey095_dbc.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
-sey095_query_c4 = sey095_query_c4.filter(and_(Photon.Wavelength > c4_wave_lim[0], Photon.Wavelength < c4_wave_lim[1]))
-sey095_query_c4 = sey095_query_c4.filter(and_(Photon.Delay < (3 * seconds_per_day), Photon.Resonance == 416))
-sey095_tf_c4 = TransferFunction(sey095_query_c4, "sey_095", ionising_luminosity=0.95e43, template=sey100_tf_c4).run()
-sey095_tf_c4.plot(velocity=True, name="vel")
-
-sey105_query_c4 = sey105_dbc.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
-sey105_query_c4 = sey105_query_c4.filter(and_(Photon.Wavelength > c4_wave_lim[0], Photon.Wavelength < c4_wave_lim[1]))
-sey105_query_c4 = sey105_query_c4.filter(and_(Photon.Delay < (3 * seconds_per_day), Photon.Resonance == 416))
-sey105_tf_c4 = TransferFunction(sey105_query_c4, "sey_105", ionising_luminosity=1.05e43, template=sey100_tf_c4).run()
-sey105_tf_c4.plot(velocity=True, name="vel")
-
-sey100_tf_c4.response_map_by_tf(sey095_tf_c4, sey105_tf_c4)
-sey100_tf_c4.plot(name="c4")
+sey100_query_c4 = sey100_query_c4.filter(and_(Photon.Delay < (20 * seconds_per_day), Photon.Resonance == 416))
+sey100_tf_c4 = TransferFunction(sey100_query_c4, "sey_100", dimensions=dims, continuum_luminosity=1.043e44).line(1550).run(scaling_factor=1/20)
 sey100_tf_c4.plot(velocity=True, name="c4_vel")
-sey100_tf_c4.plot(velocity=True, name="c4_vel_resp_tf", response=True)
+
+sey_lo_query_c4 = sey_lo_dbc.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
+sey_lo_query_c4 = sey_lo_query_c4.filter(and_(Photon.Wavelength > c4_wave_lim[0], Photon.Wavelength < c4_wave_lim[1]))
+sey_lo_query_c4 = sey_lo_query_c4.filter(and_(Photon.Delay < (20 * seconds_per_day), Photon.Resonance == 416))
+sey_lo_tf_c4 = TransferFunction(sey_lo_query_c4, "sey_090", continuum_luminosity=0.9391e44, template=sey100_tf_c4).run(scaling_factor=1/20)
+sey_lo_tf_c4.plot(velocity=True, name="vel")
+
+sey_hi_query_c4 = sey_hi_dbc.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
+sey_hi_query_c4 = sey_hi_query_c4.filter(and_(Photon.Wavelength > c4_wave_lim[0], Photon.Wavelength < c4_wave_lim[1]))
+sey_hi_query_c4 = sey_hi_query_c4.filter(and_(Photon.Delay < (20 * seconds_per_day), Photon.Resonance == 416))
+sey_hi_tf_c4 = TransferFunction(sey_hi_query_c4, "sey_110", continuum_luminosity=1.148e44, template=sey100_tf_c4).run(scaling_factor=1/20)
+sey_hi_tf_c4.plot(velocity=True, name="vel")
+
+sey100_tf_c4.response_map_by_tf(sey_lo_tf_c4, sey_hi_tf_c4)
 sey100_tf_c4.plot(velocity=True, name="c4_vel_respmap", response_map_only=True)
+
+sey100_tf_c4 = TransferFunction(sey100_query_c4, "sey_100", dimensions=dims, continuum_luminosity=1.043e44).line(1550).run(scaling_factor=1/20, delay_dynamic_range=3)
+sey100_tf_c4.plot(velocity=True, name="c4_vel_long")
+sey_lo_tf_c4 = TransferFunction(sey_lo_query_c4, "sey_090", continuum_luminosity=9.391e43, template=sey100_tf_c4).run(scaling_factor=1/20)
+sey_hi_tf_c4 = TransferFunction(sey_hi_query_c4, "sey_110", continuum_luminosity=1.148e44, template=sey100_tf_c4).run(scaling_factor=1/20)
+sey100_tf_c4.response_map_by_tf(sey_lo_tf_c4, sey_hi_tf_c4)
+sey100_tf_c4.plot(velocity=True, name="c4_vel_long_respmap", response_map_only=True)
 
 # line_list = [   ["Ha", ".lineH1.3-2.dat"],
 #                 ["Hb", ".lineH1.4-2.dat"],
