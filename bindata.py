@@ -841,7 +841,7 @@ scale_agn_090 = 1/20
 agn100_tf_c4 = TransferFunction(agn100_db, "agn100_c4", luminosity=1.043e46, dimensions=dims)
 agn100_tf_c4.line(445, 1548.18).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=1)
 agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=scale_agn_090)
-agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110, limit=lim_agn)
+agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110)#, limit=lim_agn)
 
 agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False)
 agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=2)
@@ -869,7 +869,7 @@ agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="resp_100-110", respons
 agn100_tf_ha = TransferFunction(agn100_db, "agn100_ha", luminosity=1.043e46,  template=agn100_tf_c4, template_different_line=True)
 agn100_tf_ha.line(44, 6562.81).run(scaling_factor=scale_agn_100)
 agn090_tf_ha = TransferFunction(agn090_db, "agn090_ha", luminosity=0.9391e46, template=agn100_tf_ha).run(scaling_factor=scale_agn_090)
-agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=scale_agn_110, limit=lim_agn)
+agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=scale_agn_110)#, limit=lim_agn)
 
 agn090_tf_ha.plot(velocity=True, keplerian=kep_agn, log=False)
 agn090_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=2)
@@ -898,7 +898,7 @@ agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="resp_100-110", respons
 agn100_tf_c4 = TransferFunction(agn100_db, "agn100_c4", luminosity=1.043e46,  dimensions=dims)
 agn100_tf_c4.line(445, 1548.18).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=2)
 agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=scale_agn_090)
-agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110, limit=lim_agn)
+agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110)#, limit=lim_agn)
 
 agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
 agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
@@ -925,7 +925,7 @@ agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="long_resp_100-110", re
 agn100_tf_ha = TransferFunction(agn100_db, "agn100_ha", luminosity=1.043e46,  template=agn100_tf_c4, template_different_line=True)
 agn100_tf_ha.line(44, 6562.81).run(scaling_factor=scale_agn_100)
 agn090_tf_ha = TransferFunction(agn090_db, "agn090_ha", luminosity=0.9391e46, template=agn100_tf_ha).run(scaling_factor=scale_agn_090)
-agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=scale_agn_110, limit=lim_agn)
+agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=scale_agn_110)#, limit=lim_agn)
 
 agn090_tf_ha.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
 agn090_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
