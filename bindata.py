@@ -279,13 +279,20 @@ class TransferFunction:
         delay = Centroid(bins_time_midp, data_time, threshold=0.8*calculate_modal_delay(bins_time_midp, data_time))
         # WORK IN PROGRESS
 
-    def modal_delay():
-        """Calculates the mean delay for the current data"""
-        return calculate_modal_value(calculate_midpoints(self._bins_delay), np.sum(self._flux, 1))
-    def centroid_delay():
-        """Calculates the mean delay for the current data"""
-        return calculate_centroid(calculate_midpoints(self._bins_delay), np.sum(self._flux, 1), 
-            threshold=0.8*self.modal_delay(), bounds=0.9545)
+    def modal_delay(response=False):
+        """Calculates the modal delay for the current data"""
+        if response:
+            return calculate_modal_value(calculate_midpoints(self._bins_delay), np.sum(self._response_map, 1))
+        else:
+            return calculate_modal_value(calculate_midpoints(self._bins_delay), np.sum(self._flux, 1))
+    def centroid_delay(response=False):
+        """Calculates the centroid delay for the current data"""
+        if response:
+            return calculate_centroid(calculate_midpoints(self._bins_delay), np.sum(self._response_map, 1), 
+                threshold=0.8*self.modal_delay(response=True), bounds=0.9545)
+        else:
+            return calculate_centroid(calculate_midpoints(self._bins_delay), np.sum(self._flux, 1), 
+                threshold=0.8*self.modal_delay(), bounds=0.9545)
 
     def run(self, response_map=None, line=None, scaling_factor=1.0, delay_dynamic_range=None, limit=None):
         """Performs a query on the photon DB and bins it"""
@@ -310,7 +317,11 @@ class TransferFunction:
         assert len(data) > 0,\
             "No records found!"
 
-        print("Fetched {} records from '{}'...".format(len(data), self._filename))
+        if self._spectrum is not None:
+            print("Fetched {} records from '{}' for spectrum {}...".format(len(data), self._filename), self._spectrum)
+        else:
+            print("Fetched {} records from '{}'...".format(len(data), self._filename))
+
 
         # Check if we've already got delay bins from another TF
         if self._bins_delay is None:
@@ -492,7 +503,7 @@ class TransferFunction:
         # Plot the spectrum and light curve, normalised
         data_plot_spec = np.sum(data_plot, 0) / np.abs(np.sum(data_plot))
         data_plot_resp = np.sum(data_plot, 1) / np.abs(np.sum(data_plot))
-        resp = ax_resp.plot(data_plot_resp, bins_y_midp)
+        resp = ax_resp.plot(data_plot_resp, bins_y_midp,c='m')
         
         if response_map:
             ax_spec.axhline(0, color='grey')
@@ -502,8 +513,8 @@ class TransferFunction:
             ax_spec.tick_params(axis='x', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
             ax_resp.tick_params(axis='y', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
             data_plot_rms = np.sum(np.square(data_plot), 0) / np.sum(np.square(data_plot))
-            rms = ax_spec.plot(bins_x_midp, data_plot_rms, c='C1', label='RMS Spectrum')
-            spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='C0', label='Spectrum')
+            rms = ax_spec.plot(bins_x_midp, data_plot_rms, c='c', label='RMS Spectrum')
+            spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='m', label='Spectrum')
             lg_orig = ax_spec.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
 
         else:
@@ -623,28 +634,27 @@ def open_database(s_file, s_user, s_password):
         for line in delay_dump:
             if line.startswith('#'): 
                 continue
-            values = line.split()
-            if len(values) < 12:
-                continue
             
             try:
-                for index,value in enumerate(values):
-                    values[index] = float(value)
+                values = [float(i) for i in line.split()]
             except:
                 print("Malformed line: '{}'".format(line))
                 continue
 
-            del values[0]
-            del values[8]
-            values[5] = (values[5] - values[6])
-            matom_bool = False
-            if(values[9]>= 10):
-                values[9] = values[9] - 10
-                matom_bool = True
+            if len(values) is not 13:
+                print("Malformed line: '{}'".format(line))
+                continue
 
-            dbc.add(Photon(Wavelength=values[0], Weight=values[1], X=values[2], Y=values[3], Z=values[4],
-                            ContinuumScatters=values[5], ResonantScatters=values[6], Delay=values[7],
-                            Spectrum=values[8], Origin=values[9], Resonance=values[10], Origin_matom = matom_bool))
+            #del values[0]
+            #del values[8]
+            #matom_bool = False
+            #if(values[11]>= 10):
+            #    values[11] = values[11] - 10
+            #    matom_bool = True
+
+            dbc.add(Photon(Wavelength=values[1], Weight=values[2], X=values[3], Y=values[4], Z=values[5],
+                            ContinuumScatters=values[6]-values[7], ResonantScatters=values[7], Delay=values[8],
+                            Spectrum=values[10], Origin=(values[11]%10), Resonance=values[12], Origin_matom = (values[11]>9)))
             added += 1
             if added > 10000:
                 added = 0
@@ -706,7 +716,7 @@ sey110_engine, sey110_db = open_database("/Users/swm1n12/python_runs/paper1_5548
 #sey105_engine, sey105_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_105", "root", "password")
 
 dims = [50, 50]
-kep_agn = {"angle":40, "mass":1e7, "radius":[50,2000]}
+kep_sey = {"angle":40, "mass":1e7, "radius":[50,2000]}
 kep_agn = {"angle":40, "mass":1e9, "radius":[50,20000]}
 
 # ==============================================================================
@@ -730,9 +740,11 @@ kep_agn = {"angle":40, "mass":1e9, "radius":[50,20000]}
 # sey110_tf_c4.plot(velocity=True, keplerian=kep_sey, name="log", log=True)
 
 # sey100_tf_c4.response_map_by_tf(sey090_tf_c4, sey110_tf_c4)
-# sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="resp_10", response_map=True)
-# sey100_tf_c4.response_map_by_tf(sey095_tf_c4, sey105_tf_c4)
-# sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="resp_05", response_map=True)
+# sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="resp_090-110", response_map=True)
+# sey100_tf_c4.response_map_by_tf(sey090_tf_c4, sey100_tf_c4)
+# sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="resp_090-100", response_map=True)
+# sey100_tf_c4.response_map_by_tf(sey100_tf_c4, sey110_tf_c4)
+# sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="resp_100-110", response_map=True)
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
@@ -752,9 +764,11 @@ kep_agn = {"angle":40, "mass":1e9, "radius":[50,20000]}
 # sey110_tf_ha.plot(velocity=True, keplerian=kep_sey, name="log", log=True)
 
 # sey100_tf_ha.response_map_by_tf(sey090_tf_ha, sey110_tf_ha)
-# sey100_tf_ha.plot(velocity=True, keplerian=kep_sey, name="resp_10", response_map=True)
-# sey100_tf_ha.response_map_by_tf(sey095_tf_ha, sey105_tf_ha)
-# sey100_tf_ha.plot(velocity=True, keplerian=kep_sey, name="resp_05", response_map=True)
+# sey100_tf_ha.plot(velocity=True, keplerian=kep_sey, name="resp_090-110", response_map=True)
+# sey100_tf_ha.response_map_by_tf(sey090_tf_ha, sey100_tf_ha)
+# sey100_tf_ha.plot(velocity=True, keplerian=kep_sey, name="resp_090-100", response_map=True)
+# sey100_tf_ha.response_map_by_tf(sey100_tf_ha, sey110_tf_ha)
+# sey100_tf_ha.plot(velocity=True, keplerian=kep_sey, name="resp_100-110", response_map=True)
 
 # ==============================================================================
 # RUN FOR LONG TIMESCALES
@@ -776,9 +790,11 @@ kep_agn = {"angle":40, "mass":1e9, "radius":[50,20000]}
 # sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="long_log", log=True)
 
 # sey100_tf_c4.response_map_by_tf(sey090_tf_c4, sey110_tf_c4)
-# sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="long_resp_10", response_map=True)
-# sey100_tf_c4.response_map_by_tf(sey095_tf_c4, sey105_tf_c4)
-# sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="long_resp_05", response_map=True)
+# sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="long_resp_090-110", response_map=True)
+# sey100_tf_c4.response_map_by_tf(sey090_tf_c4, sey100_tf_c4)
+# sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="long_resp_090-100", response_map=True)
+# sey100_tf_c4.response_map_by_tf(sey100_tf_c4, sey110_tf_c4)
+# sey100_tf_c4.plot(velocity=True, keplerian=kep_sey, name="long_resp_100-110", response_map=True)
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
@@ -798,41 +814,62 @@ kep_agn = {"angle":40, "mass":1e9, "radius":[50,20000]}
 # sey110_tf_ha.plot(velocity=True, keplerian=kep_sey, name="long_log", log=True, dynamic_range=2)
 
 # sey100_tf_ha.response_map_by_tf(sey090_tf_ha, sey110_tf_ha)
-# sey100_tf_ha.plot(velocity=True, keplerian=kep_sey, name="long_resp_10", response_map=True)
-# sey100_tf_ha.response_map_by_tf(sey095_tf_ha, sey105_tf_ha)
-# sey100_tf_ha.plot(velocity=True, keplerian=kep_sey, name="long_resp_05", response_map=True)
+# sey100_tf_ha.plot(velocity=True, keplerian=kep_sey, name="long_resp_090-110", response_map=True)
+# sey100_tf_ha.response_map_by_tf(sey090_tf_ha, sey100_tf_ha)
+# sey100_tf_ha.plot(velocity=True, keplerian=kep_sey, name="long_resp_090-100", response_map=True)
+# sey100_tf_ha.response_map_by_tf(sey100_tf_ha, sey110_tf_ha)
+# sey100_tf_ha.plot(velocity=True, keplerian=kep_sey, name="long_resp_100-110", response_map=True)
+
+
 
 # ==============================================================================
 # RUN FOR SHORT TIMESCALES
 # ==============================================================================
 # RUN FOR C4
 # ------------------------------------------------------------------------------
+agn_c4_radius = []
+agn_ha_radius = []
 
-lim_agn = 140000000
-#lim_agn = 10000
+#lim_agn = 140000000 #Half the file size
+lim_agn = 999999999 #Half the file size
+scale_agn_100 = 1/20
+#scale_agn_110 = 1.043478 #1.07954545455/20
+scale_agn_110 = 1/20
+#scale_agn_110 = 2/20
+scale_agn_090 = 1/20
 
 agn100_tf_c4 = TransferFunction(agn100_db, "agn100_c4", luminosity=1.043e46, dimensions=dims)
-agn100_tf_c4.line(445, 1548.18).spectrum(2).run(scaling_factor=2/20, delay_dynamic_range=1, limit=lim_agn)
-agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=2/20, limit=lim_agn)
-agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=2/20, limit=lim_agn)
+agn100_tf_c4.line(445, 1548.18).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=1)
+agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=scale_agn_090)
+agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110, limit=lim_agn)
 
 agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False)
-agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=3)
+agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=2)
 agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False)
-agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=3)
+agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=2)
 agn110_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False)
-agn110_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=3)
+agn110_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=2)
+
+
+agn100_tf_c4.response_map_by_tf(agn090_tf_c4, agn100_tf_c4)
+agn_c4_radius.append(agn_100_tf_c4.centroid_delay(response=True))
+agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="resp_090-100", response_map=True)
 
 agn100_tf_c4.response_map_by_tf(agn090_tf_c4, agn110_tf_c4)
-agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="resp_10", response_map=True)
+agn_c4_radius.append(agn_100_tf_c4.centroid_delay(response=True))
+agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="resp_090-110", response_map=True)
+
+agn100_tf_c4.response_map_by_tf(agn100_tf_c4, agn110_tf_c4)
+agn_c4_radius.append(agn_100_tf_c4.centroid_delay(response=True))
+agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="resp_100-110", response_map=True)
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
 # ------------------------------------------------------------------------------
 agn100_tf_ha = TransferFunction(agn100_db, "agn100_ha", luminosity=1.043e46,  template=agn100_tf_c4, template_different_line=True)
-agn100_tf_ha.line(44, 6562.81).run(scaling_factor=2/20, limit=lim_agn)
-agn090_tf_ha = TransferFunction(agn090_db, "agn090_ha", luminosity=0.9391e46, template=agn100_tf_ha).run(scaling_factor=2/20, limit=lim_agn)
-agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=2/20, limit=lim_agn)
+agn100_tf_ha.line(44, 6562.81).run(scaling_factor=scale_agn_100)
+agn090_tf_ha = TransferFunction(agn090_db, "agn090_ha", luminosity=0.9391e46, template=agn100_tf_ha).run(scaling_factor=scale_agn_090)
+agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=scale_agn_110, limit=lim_agn)
 
 agn090_tf_ha.plot(velocity=True, keplerian=kep_agn, log=False)
 agn090_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=2)
@@ -841,8 +878,17 @@ agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynam
 agn110_tf_ha.plot(velocity=True, keplerian=kep_agn, log=False)
 agn110_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=2)
 
+agn100_tf_ha.response_map_by_tf(agn090_tf_ha, agn100_tf_ha)
+agn_ha_radius.append(agn_100_tf_ha.centroid_delay(response=True))
+agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="resp_090-100", response_map=True)
+
 agn100_tf_ha.response_map_by_tf(agn090_tf_ha, agn110_tf_ha)
-agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="resp_10", response_map=True)
+agn_ha_radius.append(agn_100_tf_ha.centroid_delay(response=True))
+agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="resp_090-110", response_map=True)
+
+agn100_tf_ha.response_map_by_tf(agn100_tf_ha, agn110_tf_ha)
+agn_ha_radius.append(agn_100_tf_ha.centroid_delay(response=True))
+agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="resp_100-110", response_map=True)
 
 # ==============================================================================
 # RUN FOR LONG TIMESCALES
@@ -850,37 +896,58 @@ agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="resp_10", response_map
 # RUN FOR C4
 # ------------------------------------------------------------------------------
 agn100_tf_c4 = TransferFunction(agn100_db, "agn100_c4", luminosity=1.043e46,  dimensions=dims)
-agn100_tf_c4.line(445, 1548.18).spectrum(2).run(scaling_factor=2/20, delay_dynamic_range=2, limit=lim_agn)
-agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=2/20, limit=lim_agn)
-agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=2/20, limit=lim_agn)
+agn100_tf_c4.line(445, 1548.18).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=2)
+agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=scale_agn_090)
+agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110, limit=lim_agn)
 
+agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
+agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
 agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
 agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
-agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
-agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
-agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
-agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
+agn110_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
+agn110_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
+
+agn100_tf_c4.response_map_by_tf(agn090_tf_c4, agn100_tf_c4)
+agn_c4_radius.append(agn_100_tf_c4.centroid_delay(response=True))
+agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="long_resp_090-100", response_map=True)
 
 agn100_tf_c4.response_map_by_tf(agn090_tf_c4, agn110_tf_c4)
-agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="long_resp_10", response_map=True)
+agn_c4_radius.append(agn_100_tf_c4.centroid_delay(response=True))
+agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="long_resp_090-110", response_map=True)
+
+agn100_tf_c4.response_map_by_tf(agn100_tf_c4, agn110_tf_c4)
+agn_c4_radius.append(agn_100_tf_c4.centroid_delay(response=True))
+agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="long_resp_100-110", response_map=True)
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
 # ------------------------------------------------------------------------------
 agn100_tf_ha = TransferFunction(agn100_db, "agn100_ha", luminosity=1.043e46,  template=agn100_tf_c4, template_different_line=True)
-agn100_tf_ha.line(44, 6562.81).run(scaling_factor=2/20, limit=lim_agn)
-agn090_tf_ha = TransferFunction(agn090_db, "agn090_ha", luminosity=0.9391e46, template=agn100_tf_ha).run(scaling_factor=2/20, limit=lim_agn)
-agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=2/20, limit=lim_agn)
+agn100_tf_ha.line(44, 6562.81).run(scaling_factor=scale_agn_100)
+agn090_tf_ha = TransferFunction(agn090_db, "agn090_ha", luminosity=0.9391e46, template=agn100_tf_ha).run(scaling_factor=scale_agn_090)
+agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=scale_agn_110, limit=lim_agn)
 
 agn090_tf_ha.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
-agn090_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=2)
+agn090_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
 agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
-agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=2)
+agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
 agn110_tf_ha.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
-agn110_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=2)
+agn110_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
+
+agn100_tf_ha.response_map_by_tf(agn090_tf_ha, agn100_tf_ha)
+agn_ha_radius.append(agn_100_tf_ha.centroid_delay(response=True))
+agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="long_resp_090-100", response_map=True)
 
 agn100_tf_ha.response_map_by_tf(agn090_tf_ha, agn110_tf_ha)
-agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="long_resp_10", response_map=True)
+agn_ha_radius.append(agn_100_tf_ha.centroid_delay(response=True))
+agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="long_resp_090-110", response_map=True)
+
+agn100_tf_ha.response_map_by_tf(agn100_tf_ha, agn110_tf_ha)
+agn_ha_radius.append(agn_100_tf_ha.centroid_delay(response=True))
+agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="long_resp_100-110", response_map=True)
+
+print(agn_ha_radius)
+print(agn_c4_radius)
 
 sys.exit(1)
 
@@ -941,20 +1008,3 @@ ax.grid(True)
 cbar = plt.colorbar(pc, orientation="vertical")
 cbar.set_label(r"{$\Delta L$_{line}$/$\Delta$ C")
 plt.savefig("cylindrical_diff.eps", bbox_inches='tight')
-
-
-# line_list = [   ["Ha", ".lineH1.3-2.dat"],
-#                 ["Hb", ".lineH1.4-2.dat"],
-# #                ["Lb", ".lineH1.3-1.dat"],
-# #                ["Lg", ".lineH1.4-1.dat"],
-#                 ["C4", ".lineC4.dat"]   ]
-# map_95_to_105 = ResponseMap("sey_095", 0.95e43, "sey_105", 1.05e43, line_list)
-# map_95_to_105.plot('C4', x_range=[None, 15.7], z_range=[None, 15.2])
-# map_95_to_105.plot('Ha', x_range=[None, 15.7], z_range=[None, 15.2])
-# map_95_to_105.plot('Hb', x_range=[None, 15.7], z_range=[None, 15.2])
-# sey100_tf2_c4 = TransferFunction(sey100_query_c4, "sey_100", dimensions=dims, ionising_luminosity=1.00e43).line(1550)
-# sey100_tf2_c4.run(map_95_to_105, line="C4", scaling_factor=0.2)
-# keplerian_info = { "mass":1e7, "rad_min":50, "rad_max":1000, "angle":40}
-# sey100_tf2_c4.plot(velocity=True, name="c4_vel")
-# sey100_tf2_c4.plot(velocity=True, name="c4_vel_keplerian", keplerian=keplerian_info)
-# sey100_tf2_c4.plot(velocity=True, name="c4_vel_resp_local", response=True)
