@@ -318,7 +318,7 @@ class TransferFunction:
             "No records found!"
 
         if self._spectrum is not None:
-            print("Fetched {} records from '{}' for spectrum {}...".format(len(data), self._filename), self._spectrum)
+            print("Fetched {} records from '{}' for spectrum {}...".format(len(data), self._filename, self._spectrum))
         else:
             print("Fetched {} records from '{}'...".format(len(data), self._filename))
 
