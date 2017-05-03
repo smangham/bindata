@@ -541,7 +541,7 @@ program main
 			read(iFileIn,'(A512)',iostat=iEOF) cBuffer
 			if(cBuffer(1:1).NE."#")then
 				read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
-											iNScat, iNRScat, rDelay, iDummy, iObserver, iOrigin, iNRes
+											iNScat, iNRScat, rDelay, iObserver, iOrigin, iNRes
 
 				if(iErr.GT.0)then
 					iErr=0
@@ -595,7 +595,7 @@ program main
 		if(cBuffer(1:1).NE."#")then
 			iPhot=iPhot+1
 			read(cBuffer,*,iostat=iErr) rDummy, rLambda, rWeight, rPosX, rPosY, rPosZ, &
-										iNScat, iNRScat, rDelay, iDummy, iObserver, iOrigin, iNRes
+										iNScat, iNRScat, rDelay, iObserver, iOrigin, iNRes
 			iNCScat = iNScat - iNRScat
 
 			!If we're in line mode, check to see if this photon's origin line is in the list of tracked lines
