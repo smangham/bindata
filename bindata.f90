@@ -34,7 +34,11 @@ program main
 
 	!Variables for gnuplot
 	logical 			:: bChangeCB=.FALSE., bNoKey=.FALSE., bNoTicks=.FALSE.
-	real(iKindDP)		:: rMinCB, rMaxCB
+	real(iKindDP)	:: rMinCB, rMaxCB
+	character(len=512)	:: cKey = ""
+
+	!Variables for output
+	logical 			:: bWithUnits=.FALSE.
 
 	!Reweighting variables
 	logical 			:: bReweight=.FALSE., bReweightBinLog=.FALSE., bReweightBinGeom=.FALSE., bLookupY=.TRUE.
@@ -191,7 +195,7 @@ program main
 		else if(cArg.EQ."-v".OR.cArg.EQ."-V")then
 			call get_command_argument(iArg+1, cArg)
 			read(cArg,*,iostat=iErr)rMinX
-			if(iErr.NE.0 .OR.rMinX.LT.0)then
+			if(iErr.NE.0)then
 				print *,"ERROR: Minimum wavelength argument '"//trim(cArg)//"' invalid!"
 				STOP
 			endif
@@ -441,9 +445,9 @@ program main
 		rMaxR = rfGetKeyword(trim(cFileIn)//".pf","wind_keplerian.diskmax")*rRad 	!Units = rstar
 	endif
 	if(rMinX.LT.0)then
-		rMinX = rfGetKeyword(trim(cFileIn)//".pf","spectrum_wavemin")
-		rMaxX = rfGetKeyword(trim(cFileIn)//".pf","spectrum_wavemax")
-		print '(X,A,ES8.2,A,ES8.2,A,I0,A)','Binning wavelengths from ',rMinX,' to ',rMaxX,' in ',iDimX,' steps'
+	!	rMinX = rfGetKeyword(trim(cFileIn)//".pf","spectrum_wavemin")
+	!	rMaxX = rfGetKeyword(trim(cFileIn)//".pf","spectrum_wavemax")
+	!	print '(X,A,ES8.2,A,ES8.2,A,I0,A)','Binning wavelengths from ',rMinX,' to ',rMaxX,' in ',iDimX,' steps'
 	endif
 	if(bLookupY)then
 		rRad = rfGetKeyword(trim(cFileIn)//".pf","wind.radmax")
@@ -632,7 +636,11 @@ program main
 			else 
 
 				iPhotR= iPhotR+1
-				iBinX = ifLookupIndex(arBinX,rLambda)
+				if(bLineVel)then
+					iBinX = ifLookupIndex(arBinX,rfWaveToVel(rLambda, rLineLambda))
+				else
+					iBinX = ifLookupIndex(arBinX,rLambda)
+				endif
 				iBinY = ifLookupIndex(arBinY,rDelay/rSecsToDays)
 				if(iBinX.LT.1 .OR. iBinY.LT.1)then
 					iErrLog=iErrLog+1
@@ -702,15 +710,28 @@ program main
 			print '(A)','Writing to "'//trim(cFileOut)//'.eps"'
 		endif
 
-		!Normalise the results
-		print *,"Total flux for observer: ",arNormalise(iObs)
-		rRespMax = 0
-		do i=1, iDimX
-			do j=1, iDimY
-				if(arMap(i,j,iObs).GT.rRespMax) rRespMax = arMap(i,j,iObs)
+		print *,"Total flux for observer: ",arNormalise(iObs)		
+		if(bWithUnits)then
+			!Give units
+			do i=1, iDimX
+				do j=1, iDimY
+					!We have binned erg s in bins of [A|m/s] and days
+					arMap(i,j,iObs) = arMap(i,j,iObs) * rSecsToDays / &
+							((arBinX(i+1)-arBinX(i)) * (arBinY(i+1)-arBinY(i)))
+				end do
 			end do
-		end do
-		arMap(:,:,iObs) = arMap(:,:,iObs)/rRespMax
+		else
+			!Normalise the results
+			rRespMax = 0
+			do i=1, iDimX
+				do j=1, iDimY
+					if(arMap(i,j,iObs).GT.rRespMax) rRespMax = arMap(i,j,iObs)
+				end do
+			end do
+			arMap(:,:,iObs) = arMap(:,:,iObs)/rRespMax
+		endif
+		
+
 
 		!If we are tracking a single line to find the mass
 		if(bLineMode.AND.iLines.EQ.1)then
@@ -795,32 +816,9 @@ program main
 		write(iFileOut,'(A)')'set xrange ['//trim(r2c(rMinX))//':'//trim(r2c(rMaxX))//']'
 		write(iFileOut,'(A)')'set yrange ['//trim(r2c(rMinY))//':'//trim(r2c(rMaxY))//']'
 
-		if(bLineVel)then
-			rLineVelMax = (rcC/1e5) * (rMaxX - rLineLambda)/rLineLambda
-			rLineVelMin = (rcC/1e5) * (rMinX - rLineLambda)/rLineLambda
-			rLineVelUpper = rLineVelMax - modulo(rLineVelMax, 1000.0)
-			if(modulo(rLineVelMin,1000.0)>0)then
-				rLineVelLower = rLineVelMin + (1000.0 - modulo(rLineVelMin, 1000.0))
-			else
-				rLineVelLower = rLineVelMin
-			endif
-			rLineLambdaU2 = rLineLambda + (rLineLambda *  rLineVelUpper      / (rcC/1e5))
-			rLineLambdaU1 = rLineLambda + (rLineLambda * (rLineVelUpper/2.0) / (rcC/1e5))
-			rLineLambdaL1 = rLineLambda + (rLineLambda * (rLineVelLower/2.0) / (rcC/1e5))
-			rLineLambdaL2 = rLineLambda + (rLineLambda *  rLineVelLower      / (rcC/1e5))
-
-			write(iFileOut,'(A)')'set xtics ('//&
-							      trim(r2c(rLineLambdaL2))//&
-							', '//trim(r2c(rLineLambdaL1))//&
-							', '//trim(r2c(rLineLambda))//&
-							', '//trim(r2c(rLineLambdaU1))//&
-							', '//trim(r2c(rLineLambdaU2))//&
-							') mirror format ""'	
-		else
-			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
-							', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
-							', '//trim(r2c(rMaxX))//') mirror format ""'
-		endif
+		write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
+						', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
+						', '//trim(r2c(rMaxX))//') mirror format ""'
 
 		write(iFileOut,'(A)')'unset xlabel'
 		write(iFileOut,'(A)')'set ytics ('//trim(r2c(rMinY))//', '//trim(r2c(rMinY+.25*rRngY))//&
@@ -834,18 +832,22 @@ program main
 		else
 			write(iFileOut,'(A)')'set cbrange [1e-5 : 1]'
 		endif
-		if(bLineVel)then
+		
+		if(.NOT.bNoKey)then
 			if(bNoLog)then
-				write(iFileOut,'(A)')'set cblabel "{/Symbol j}(v, {/Symbol t})" font ",24" offset 1,0'
+				cKey = 'set cblabel "Log "'
 			else
-				write(iFileOut,'(A)')'set cblabel "Log {/Symbol j}(v, {/Symbol t})" font ",24" offset 1,0'
+				cKey = 'set cblabel '
 			endif
-		else
-			if(bNoLog)then
-				write(iFileOut,'(A)')'set cblabel "{/Symbol j}({/Symbol n}, {/Symbol t})" font ",24" offset 1,0'
+			if(bLineVel)then
+				cKey = trim(cKey)//'"{/Symbol j}(v, {/Symbol t}) '
 			else
-				write(iFileOut,'(A)')'set cblabel "Log {/Symbol j}({/Symbol n}, {/Symbol t})" font ",24" offset 1,0'
+				cKey = trim(cKey)//'"{/Symbol j}(v, {/Symbol t}) '
 			endif
+			if(bWithUnits)then
+				cKey = trim(cKey)//' erg {\305}^{-1}'
+			endif
+			cKey = trim(cKey)//'" font ",24" offset 1,0'
 		endif
 
 		if(bPointwiseOnly)then
@@ -887,13 +889,9 @@ program main
 		if(bNoTicks)then
 		elseif(bLineVel)then
 			write(iFileOut,'(A)')'set xlabel "Velocity (10^{3} km s^{-1})" font ",22"'
-			write(iFileOut,'(A)')'set xtics ('//&
-							 ' "'//trim(r2cDef(rLineVelLower/1000.0))//'" '//trim(r2c(rLineLambdaL2))//&
-							', "'//trim(r2cDef(rLineVelLower/2000.0))//'" '//trim(r2c(rLineLambdaL1))//&
-							', "0" '//trim(r2c(rLineLambda))//&
-							', "'//trim(r2cDef(rLineVelUpper/2000.0))//'" '//trim(r2c(rLineLambdaU1))//&
-							', "'//trim(r2cDef(rLineVelUpper/1000.0))//'" '//trim(r2c(rLineLambdaU2))//&
-							') mirror format ""'
+			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
+							', '//trim(r2c(rMinX+.5*rRngX))//', '//trim(r2c(rMinX+.75*rRngX))//&
+							', '//trim(r2c(rMaxX))//') mirror format '//'"%.1f"'
 		else
 			write(iFileOut,'(A)')'set xlabel "Wavelength (10^{-10}cm)" font ",22"'
 			write(iFileOut,'(A)')'set xtics ('//trim(r2c(rMinX))//', '//trim(r2c(rMinX+.25*rRngX))//&
@@ -951,6 +949,11 @@ contains
 
 		print *,'Mass for line: '//trim(r2c(rMass))//' ('//trim(r2c(rMassMin))//' - '//trim(r2c(rMassMax))//')'
 	End Subroutine
+
+	Real(iKindDP) Function rfWaveToVel(rWave, rLineWave)
+		Real(iKindDP), intent(in)				:: rLineWave, rWave
+		rfWaveToVel = rcC * (rWave - rLineWave) / rLineWave
+	End Function
 
 	Real(iKindDP) Function rfFindFWHM(arVal, arBin)
 		Real(iKindDP), intent(in), dimension(:)		:: arVal, arBin
