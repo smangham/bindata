@@ -868,15 +868,15 @@ agn110_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynam
 
 
 agn100_tf_c4.response_map_by_tf(agn090_tf_c4, agn100_tf_c4)
-agn_c4_radius.append(agn100_tf_c4.centroid_delay(response=True))
+agn_c4_radius.append(agn100_tf_c4.centroid_delay(True))
 agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="resp_090-100", response_map=True)
 
 agn100_tf_c4.response_map_by_tf(agn090_tf_c4, agn110_tf_c4)
-agn_c4_radius.append(agn100_tf_c4.centroid_delay(response=True))
+agn_c4_radius.append(agn100_tf_c4.centroid_delay(True))
 agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="resp_090-110", response_map=True)
 
 agn100_tf_c4.response_map_by_tf(agn100_tf_c4, agn110_tf_c4)
-agn_c4_radius.append(agn100_tf_c4.centroid_delay(response=True))
+agn_c4_radius.append(agn100_tf_c4.centroid_delay(True))
 agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="resp_100-110", response_map=True)
 
 # ------------------------------------------------------------------------------
@@ -895,15 +895,15 @@ agn110_tf_ha.plot(velocity=True, keplerian=kep_agn, log=False)
 agn110_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=2)
 
 agn100_tf_ha.response_map_by_tf(agn090_tf_ha, agn100_tf_ha)
-agn_ha_radius.append(agn100_tf_ha.centroid_delay(response=True))
+agn_ha_radius.append(agn100_tf_ha.centroid_delay(True))
 agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="resp_090-100", response_map=True)
 
 agn100_tf_ha.response_map_by_tf(agn090_tf_ha, agn110_tf_ha)
-agn_ha_radius.append(agn100_tf_ha.centroid_delay(response=True))
+agn_ha_radius.append(agn100_tf_ha.centroid_delay(True))
 agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="resp_090-110", response_map=True)
 
 agn100_tf_ha.response_map_by_tf(agn100_tf_ha, agn110_tf_ha)
-agn_ha_radius.append(agn100_tf_ha.centroid_delay(response=True))
+agn_ha_radius.append(agn100_tf_ha.centroid_delay(True))
 agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="resp_100-110", response_map=True)
 
 # ==============================================================================
@@ -924,15 +924,15 @@ agn110_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
 agn110_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
 
 agn100_tf_c4.response_map_by_tf(agn090_tf_c4, agn100_tf_c4)
-agn_c4_radius.append(agn100_tf_c4.centroid_delay(response=True))
+agn_c4_radius.append(agn100_tf_c4.centroid_delay(True))
 agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="long_resp_090-100", response_map=True)
 
 agn100_tf_c4.response_map_by_tf(agn090_tf_c4, agn110_tf_c4)
-agn_c4_radius.append(agn100_tf_c4.centroid_delay(response=True))
+agn_c4_radius.append(agn100_tf_c4.centroid_delay(True))
 agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="long_resp_090-110", response_map=True)
 
 agn100_tf_c4.response_map_by_tf(agn100_tf_c4, agn110_tf_c4)
-agn_c4_radius.append(agn100_tf_c4.centroid_delay(response=True))
+agn_c4_radius.append(agn100_tf_c4.centroid_delay(True))
 agn100_tf_c4.plot(velocity=True, keplerian=kep_agn, name="long_resp_100-110", response_map=True)
 
 # ------------------------------------------------------------------------------
@@ -951,15 +951,15 @@ agn110_tf_ha.plot(velocity=True, keplerian=kep_agn, log=False, name="long")
 agn110_tf_ha.plot(velocity=True, keplerian=kep_agn, log=True,  name="long_log", dynamic_range=3)
 
 agn100_tf_ha.response_map_by_tf(agn090_tf_ha, agn100_tf_ha)
-agn_ha_radius.append(agn100_tf_ha.centroid_delay(response=True))
+agn_ha_radius.append(agn100_tf_ha.centroid_delay(True))
 agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="long_resp_090-100", response_map=True)
 
 agn100_tf_ha.response_map_by_tf(agn090_tf_ha, agn110_tf_ha)
-agn_ha_radius.append(agn100_tf_ha.centroid_delay(response=True))
+agn_ha_radius.append(agn100_tf_ha.centroid_delay(True))
 agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="long_resp_090-110", response_map=True)
 
 agn100_tf_ha.response_map_by_tf(agn100_tf_ha, agn110_tf_ha)
-agn_ha_radius.append(agn100_tf_ha.centroid_delay(response=True))
+agn_ha_radius.append(agn100_tf_ha.centroid_delay(True))
 agn100_tf_ha.plot(velocity=True, keplerian=kep_agn, name="long_resp_100-110", response_map=True)
 
 print(agn_ha_radius)
