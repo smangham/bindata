@@ -265,9 +265,9 @@ class TransferFunction:
             "Low state TF missing continuum luminosity information!"
         assert high_state._luminosity != None,\
             "High state TF missing continuum luminosity information!"
-        assert low_state._luminosity < self._luminosity,\
+        assert low_state._luminosity <= self._luminosity,\
             "Low state ionising luminosity greater than target TF ionising luminosity!"
-        assert high_state._luminosity > self._luminosity,\
+        assert high_state._luminosity >= self._luminosity,\
             "High state ionising luminosity lower than target TF ionising luminosity!"
 
         # If that is true, the map is trivial to construct. We divide the difference in TFs by the luminosity difference
