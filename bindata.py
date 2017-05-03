@@ -122,7 +122,11 @@ class TransferFunction:
         # self._query = database.query(Photon.Wavelength, Photon.Delay, Photon.Weight, Photon.X, Photon.Z)
         start = time.clock()
 
-        self._query = database.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
+        self._database = database
+        Session = sqlalchemy.orm.sessionmaker(bind=self._database)
+        self._session = Session()
+        self._query = self._session.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
+
         self._delay_dynamic_range = None
         self._velocity = None
         self._line_list = None
@@ -168,6 +172,14 @@ class TransferFunction:
             self._luminosity=luminosity
         # print("'{}' successfully created ({:.1f}s)".format(self._filename, time.clock()-start))
 
+    def close_query(self):
+        self._session.close()
+        del(self._query)
+        del(self._session)
+        Session = sqlalchemy.orm.sessionmaker(bind=self._database)
+        self._session = Session()
+        self._query = self._session.query(Photon.Wavelength, Photon.Delay, Photon.Weight)
+        return(self)
 
     def spectrum(self, number):
         self._spectrum = number
@@ -616,12 +628,12 @@ def open_database(s_file, s_user, s_password):
     ### DOES IT ALREADY EXIST? ###
     # print ("Searching for table 'Photons'...")
     Session = sqlalchemy.orm.sessionmaker(bind=db_engine)
-    dbc = Session()
+    session = Session()
 
     start = time.clock()
 
     try:
-        dbc.query(Photon.Weight).first()
+        session.query(Photon.Weight).first()
         # If so, we go with what we've found.
         print("Found existing filled photon database '{}'".format(s_file))
     except sqlalchemy.exc.SQLAlchemyError as e:
@@ -659,10 +671,13 @@ def open_database(s_file, s_user, s_password):
             if added > 10000:
                 added = 0
                 dbc.commit()
-        dbc.commit()
+
+        session.commit()
+        session.close()
+        del(session)
         print("Successfully read in ({:.1f}s)".format(time.clock()-start))
 
-    return db_engine, dbc
+    return db_engine
 # ==============================================================================       
 
 #s_root = "ngc5548_1e00_obs_2"
@@ -696,6 +711,7 @@ class Photon(Base):
     Origin = sqlalchemy.Column(sqlalchemy.Integer)
     Resonance = sqlalchemy.Column(sqlalchemy.Integer)
     Origin_matom = sqlalchemy.Column(sqlalchemy.Boolean)
+    #__table_args__ = (sqlalchemy.Index('spec_res', "Spectrum", "Resonance"),)
 
 
 # agn_spec0_engine, agn_spec0_db = open_database("/Users/swm1n12/python_runs/paper1_fiducial/agn_obs_0", "root", "password")
@@ -705,13 +721,13 @@ class Photon(Base):
 # agn_spec4_engine, agn_spec4_db = open_database("/Users/swm1n12/python_runs/paper1_fiducial/agn_obs_4", "root", "password")
 # agn_spec5_engine, agn_spec5_db = open_database("/Users/swm1n12/python_runs/paper1_fiducial/agn_obs_5", "root", "password")
 
-agn100_engine, agn100_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_100", "root", "password")
-agn090_engine, agn090_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_090", "root", "password")
-agn110_engine, agn110_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_110", "root", "password")
+agn100_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_100_indexed", "root", "password")
+agn090_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_090", "root", "password")
+agn110_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_110_fillet", "root", "password")
 
-sey100_engine, sey100_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100", "root", "password")
-sey090_engine, sey090_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
-sey110_engine, sey110_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
+sey100_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100", "root", "password")
+sey090_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
+sey110_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
 #sey095_engine, sey095_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_095", "root", "password")
 #sey105_engine, sey105_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_105", "root", "password")
 
@@ -840,8 +856,8 @@ scale_agn_090 = 1/20
 
 agn100_tf_c4 = TransferFunction(agn100_db, "agn100_c4", luminosity=1.043e46, dimensions=dims)
 agn100_tf_c4.line(445, 1548.18).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=1)
-agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=scale_agn_090)
 agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110)#, limit=lim_agn)
+agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=scale_agn_090)
 
 agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=False)
 agn090_tf_c4.plot(velocity=True, keplerian=kep_agn, log=True,  name="log", dynamic_range=2)
@@ -958,13 +974,12 @@ def cart2cyl(x,y):
 
 # r, theta, z
 print("Querying")
-p110 = np.asarray(sey110_db.query(Photon.X, Photon.Y, Photon.Z, Photon.Weight).filter(Photon.Delay < 1*seconds_per_day, Photon.Resonance == 416, Photon.Wavelength > 1550, \
+p110 = np.asarray(sey110_db.connect().query(Photon.X, Photon.Y, Photon.Z, Photon.Weight).filter(Photon.Delay < 1*seconds_per_day, Photon.Resonance == 416, Photon.Wavelength > 1550, \
     Photon.Wavelength < doppler_shift_wave(1550, 5e6)).all())
-p090 = np.asarray(sey090_db.query(Photon.X, Photon.Y, Photon.Z, Photon.Weight).filter(Photon.Delay < 1*seconds_per_day, Photon.Resonance == 416, Photon.Wavelength > 1550, \
+p090 = np.asarray(sey090_db.connect().query(Photon.X, Photon.Y, Photon.Z, Photon.Weight).filter(Photon.Delay < 1*seconds_per_day, Photon.Resonance == 416, Photon.Wavelength > 1550, \
     Photon.Wavelength < doppler_shift_wave(1550, 5e6)).all())
-p100 = np.asarray(sey090_db.query(Photon.X, Photon.Y, Photon.Z, Photon.Weight).filter(Photon.Delay < 1*seconds_per_day, Photon.Resonance == 416, Photon.Wavelength > 1550, \
+p100 = np.asarray(sey100_db.connect().query(Photon.X, Photon.Y, Photon.Z, Photon.Weight).filter(Photon.Delay < 1*seconds_per_day, Photon.Resonance == 416, Photon.Wavelength > 1550, \
     Photon.Wavelength < doppler_shift_wave(1550, 5e6)).all())
-
 
 a090 = np.delete(p090, np.s_[-1], axis=1)
 a110 = np.delete(p110, np.s_[-1], axis=1)
