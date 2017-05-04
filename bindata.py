@@ -748,12 +748,12 @@ dims = [50, 50]
 kep_sey = {"angle":40, "mass":1e7, "radius":[50,2000]}
 kep_agn = {"angle":40, "mass":1e9, "radius":[50,20000]}
 
-def do_tf_plots(tf_list_inp, dynnamic_range=None, keplerian=False, name=None):
+def do_tf_plots(tf_list_inp, dynnamic_range=None, keplerian=None, name=None):
     for tf_inp in tf_list_inp:
         tf_inp.plot(velocity=True, keplerian=keplerian, log=False, name=name)
         tf_inp.plot(velocity=True, keplerian=keplerian, log=True,  name=name+"log", dynamic_range=dynamic_range)
     return
-def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=keplerian, name=None):
+def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None):
     rf_delay = []
     tf_mid.response_map_by_tf(tf_min, tf_mid).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"resp_low")
     rf_delay.append(tf_mid.centroid_delay(response=True))
