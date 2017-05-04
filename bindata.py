@@ -524,7 +524,7 @@ class TransferFunction:
             ax_resp.set_xticks([0])
             ax_spec.tick_params(axis='x', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
             ax_resp.tick_params(axis='y', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
-            data_plot_rms = np.sum(np.square(data_plot), 0) / np.sum(np.square(data_plot))
+            data_plot_rms = np.sum(np.sqrt(np.square(data_plot), 0)) / np.sum(np.sqrt(np.square(data_plot)))
             rms = ax_spec.plot(bins_x_midp, data_plot_rms, c='c', label='RMS Spectrum')
             spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='m', label='Spectrum')
             lg_orig = ax_spec.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
