@@ -43,25 +43,29 @@ def calculate_centroid(X,Y, threshold=0, bounds=None):
     """Returns the centroid position, with optional minimum X threshold, and flux interval"""
     bins = X[X>threshold]
     vals = Y[X>threshold]
+    print('bins',bins)
+    print('vals',vals)
     centroid_total = np.sum(vals)
     centroid_position = np.sum(np.multiply(bins,vals))/centroid_total
 
     if bounds is not None:
         bound_width = bounds/2
         value_total = 0
-        for index, value in enumerate(Y):
+        for index, value in enumerate(vals):
             value_total += value
             if value_total/centroid_total >= 0.5+bound_width:
-                x_max = X[index]
+                bound_max = bins[index]
                 break
         value_total = centroid_total
-        for index,value in enumerate(Y[::-1]):
+        for index,value in enumerate(vals[::-1]):
             value_total -= value
             if value_total/centroid_total <= 0.5-bound_width:
-                x_min = X[len(X)-1-index]
+                bound_min = bins[len(bins)-1-index]
                 break
-        return centroid_position, x_min, x_max
+        print(centroid_position, bound_min, bound_max)
+        return centroid_position, bound_min, bound_max
     else:
+    	print(centroid_position)
         return centroid_position
 
 def calculate_modal_value(X,Y):
@@ -431,24 +435,10 @@ class TransferFunction:
         ax_resp = None
         ax_rms = None
         # Set up the multiplot figure and axis
-        if response_map:
-            # fig = plt.figure()
-            # ax_spec = plt.subplot2grid((6,6), (1,0), colspan=4)
-            # ax_resp = plt.subplot2grid((6,6), (2,4), rowspan=4)
-            # ax_rms  = plt.subplot2grid((6,6), (0,0), colspan=4, sharex=ax_spec)
-            # ax_tf   = plt.subplot2grid((6,6), (2,0), colspan=4, rowspan=4, sharex=ax_spec, sharey=ax_resp)
-            # ax_cb   = plt.subplot2grid((6,6), (2,5), rowspan=4, sharey=ax_resp)
-            # ax_cb.axis('off')
-
-            fig, ((ax_spec, ax_none), (ax_tf, ax_resp)) = plt.subplots(2,2,sharex='col', sharey='row',
-            gridspec_kw={'width_ratios':[3,1], 'height_ratios':[1,3]})
-            ax_none.axis('off')
-        else:
-            fig, ((ax_spec, ax_none), (ax_tf, ax_resp)) = plt.subplots(2,2,sharex='col', sharey='row',
-            gridspec_kw={'width_ratios':[3,1], 'height_ratios':[1,3]})
-            ax_none.axis('off')
-
-        fig.subplots_adjust(hspace=0, wspace=0)
+        fig, ((ax_spec, ax_none), (ax_tf, ax_resp)) = plt.subplots(2,2,sharex='col', sharey='row',
+        	gridspec_kw={'width_ratios':[3,1], 'height_ratios':[1,3]})
+        	ax_none.axis('off')
+		fig.subplots_adjust(hspace=0, wspace=0)
 
         # Set the properties that depend on log and wave/velocity status
         cb_label = None
