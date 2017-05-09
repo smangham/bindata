@@ -42,7 +42,8 @@ def calculate_FWHM(X,Y):
 def calculate_centroid(X,Y, threshold=0, bounds=None):
     """Returns the centroid position, with optional minimum X threshold, and flux interval"""
     bins = X[X>threshold]
-    vals = np.ma.masked_less(Y[X>threshold], 0)
+    vals_unmasked = Y[X>threshold]
+    vals = np.ma.where(Y<0)
     print('bins',bins)
     print('vals',vals)
     centroid_total = np.sum(vals)
@@ -753,7 +754,6 @@ def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=''):
 sey100_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100", "root", "password")
 sey090_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
 sey110_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
-
 
 lim_sey = 9999
 
