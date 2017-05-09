@@ -822,7 +822,7 @@ agn110_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_110_fi
 agn_c4_radius = []
 agn_ha_radius = []
 
-lim_agn = 999999999 
+lim_agn = 10000 
 
 scale_agn_100 = 1/20
 scale_agn_110 = 1/20
