@@ -65,7 +65,7 @@ def calculate_centroid(X,Y, threshold=0, bounds=None):
         print(centroid_position, bound_min, bound_max)
         return centroid_position, bound_min, bound_max
     else:
-    	print(centroid_position)
+        print(centroid_position)
         return centroid_position
 
 def calculate_modal_value(X,Y):
@@ -436,9 +436,9 @@ class TransferFunction:
         ax_rms = None
         # Set up the multiplot figure and axis
         fig, ((ax_spec, ax_none), (ax_tf, ax_resp)) = plt.subplots(2,2,sharex='col', sharey='row',
-        	gridspec_kw={'width_ratios':[3,1], 'height_ratios':[1,3]})
-        	ax_none.axis('off')
-		fig.subplots_adjust(hspace=0, wspace=0)
+            gridspec_kw={'width_ratios':[3,1], 'height_ratios':[1,3]})
+            ax_none.axis('off')
+        fig.subplots_adjust(hspace=0, wspace=0)
 
         # Set the properties that depend on log and wave/velocity status
         cb_label = None
