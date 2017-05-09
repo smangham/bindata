@@ -42,7 +42,7 @@ def calculate_FWHM(X,Y):
 def calculate_centroid(X,Y, threshold=0, bounds=None):
     """Returns the centroid position, with optional minimum X threshold, and flux interval"""
     bins = X[X>threshold]
-    vals = Y[X>threshold]
+    vals = np.ma.masked_less(Y[X>threshold], 0)
     print('bins',bins)
     print('vals',vals)
     centroid_total = np.sum(vals)
@@ -755,11 +755,11 @@ sey090_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_090",
 sey110_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
 
 
-lim_sey = 999999999
+lim_sey = 9999
 
-scale_sey_100 = 1/20
-scale_sey_110 = 1/20
-scale_sey_090 = 1/20
+scale_sey_100 = (1/20)/4.35
+scale_sey_110 = (1/20)/4.35
+scale_sey_090 = (1/20)/4.35
 
 # ==============================================================================
 # RUN FOR SHORT TIMESCALES
@@ -821,7 +821,7 @@ agn100_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_100_in
 agn090_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_090", "root", "password")
 agn110_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_110_fillet", "root", "password")
 
-lim_agn = 999999999
+lim_agn = 9999
 
 scale_agn_100 = 1/20
 scale_agn_110 = 1/20
