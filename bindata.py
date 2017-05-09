@@ -41,9 +41,9 @@ def calculate_FWHM(X,Y):
 
 def calculate_centroid(X,Y, threshold=0, bounds=None):
     """Returns the centroid position, with optional minimum X threshold, and flux interval"""
-    bins = X[X>threshold]
-    vals_unmasked = Y[X>threshold]
-    vals = np.ma.where(Y<0)
+    bins = np.array(X[X>threshold])
+    vals = np.array(Y[X>threshold])
+    vals[vals<0] = 0
     print('bins',bins)
     print('vals',vals)
     centroid_total = np.sum(vals)
