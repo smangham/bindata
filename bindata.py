@@ -437,7 +437,7 @@ class TransferFunction:
         # Set up the multiplot figure and axis
         fig, ((ax_spec, ax_none), (ax_tf, ax_resp)) = plt.subplots(2,2,sharex='col', sharey='row',
             gridspec_kw={'width_ratios':[3,1], 'height_ratios':[1,3]})
-            ax_none.axis('off')
+        ax_none.axis('off')
         fig.subplots_adjust(hspace=0, wspace=0)
 
         # Set the properties that depend on log and wave/velocity status
