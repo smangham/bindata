@@ -754,58 +754,58 @@ sey100_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100",
 sey090_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
 sey110_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
 
-# # ==============================================================================
-# # RUN FOR SHORT TIMESCALES
-# # ==============================================================================
-# # RUN FOR C4
-# # ------------------------------------------------------------------------------
+# ==============================================================================
+# RUN FOR SHORT TIMESCALES
+# ==============================================================================
+# RUN FOR C4
+# ------------------------------------------------------------------------------
 
-# sey100_tf_c4 = TransferFunction(sey100_db, "sey100_c4", luminosity=1.043e44, dimensions=dims)
-# sey100_tf_c4.line(416, 1548.18).run(scaling_factor=1/20, delay_dynamic_range=1.5)
-# sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4).run(scaling_factor=1/20)
-# sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4).run(scaling_factor=1/20)
+sey100_tf_c4 = TransferFunction(sey100_db, "sey100_c4", luminosity=1.043e44, dimensions=dims)
+sey100_tf_c4.line(416, 1548.18).run(scaling_factor=1/20, delay_dynamic_range=1.5)
+sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4).run(scaling_factor=1/20)
+sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4).run(scaling_factor=1/20)
 
-# do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey)
-# do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey)
+do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey)
+do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey)
 
-# # ------------------------------------------------------------------------------
-# # RUN FOR Ha
-# # ------------------------------------------------------------------------------
-# sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
-# sey100_tf_ha.line(28, 6562.81).run(scaling_factor=1/20)
-# sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha).run(scaling_factor=1/20)
-# sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha).run(scaling_factor=1/20)
+# ------------------------------------------------------------------------------
+# RUN FOR Ha
+# ------------------------------------------------------------------------------
+sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
+sey100_tf_ha.line(28, 6562.81).run(scaling_factor=1/20)
+sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha).run(scaling_factor=1/20)
+sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha).run(scaling_factor=1/20)
 
-# do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey)
-# do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey)
+do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey)
+do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey)
 
-# # ==============================================================================
-# # RUN FOR LONG TIMESCALES
-# # ==============================================================================
-# # RUN FOR C4
-# # ------------------------------------------------------------------------------
-# sey100_tf_c4 = TransferFunction(sey100_db, "sey100_c4", luminosity=1.043e44,  dimensions=dims)
-# sey100_tf_c4.line(416, 1548.18).run(scaling_factor=1/20, delay_dynamic_range=2.5)
-# sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4).run(scaling_factor=1/20)
-# sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4).run(scaling_factor=1/20)
+# ==============================================================================
+# RUN FOR LONG TIMESCALES
+# ==============================================================================
+# RUN FOR C4
+# ------------------------------------------------------------------------------
+sey100_tf_c4 = TransferFunction(sey100_db, "sey100_c4", luminosity=1.043e44,  dimensions=dims)
+sey100_tf_c4.line(416, 1548.18).run(scaling_factor=1/20, delay_dynamic_range=2.5)
+sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4).run(scaling_factor=1/20)
+sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4).run(scaling_factor=1/20)
 
-# do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey, dynamic_range=2, name="long")
-# sey_c4_delay = do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey, name="long")
-# np.savetxt("sey_c4_delay.txt", sey_c4_delay, header="Delay Delay_Lower Delay_Upper")
+do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey, dynamic_range=2, name="long")
+sey_c4_delay = do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey, name="long")
+np.savetxt("sey_c4_delay.txt", sey_c4_delay, header="Delay Delay_Lower Delay_Upper")
 
-# # ------------------------------------------------------------------------------
-# # RUN FOR Ha
-# # ------------------------------------------------------------------------------
-# sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
-# sey100_tf_ha.line(28, 6562.81).run(scaling_factor=1/20)
-# sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha).run(scaling_factor=1/20)
-# # sey095_tf_ha = TransferFunction(sey095_db, "sey095_ha", luminosity=0.9912e44, template=sey100_tf_ha).run(scaling_factor=1)
-# # sey105_tf_ha = TransferFunction(sey105_db, "sey105_ha", luminosity=1.096e44,  template=sey100_tf_ha).run(scaling_factor=1)
-# sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha).run(scaling_factor=1/20)
+# ------------------------------------------------------------------------------
+# RUN FOR Ha
+# ------------------------------------------------------------------------------
+sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
+sey100_tf_ha.line(28, 6562.81).run(scaling_factor=1/20)
+sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha).run(scaling_factor=1/20)
+# sey095_tf_ha = TransferFunction(sey095_db, "sey095_ha", luminosity=0.9912e44, template=sey100_tf_ha).run(scaling_factor=1)
+# sey105_tf_ha = TransferFunction(sey105_db, "sey105_ha", luminosity=1.096e44,  template=sey100_tf_ha).run(scaling_factor=1)
+sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha).run(scaling_factor=1/20)
 
-# do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey, dynamic_range=2, name="long")
-# sey_ha_delay = do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey, name="long")
-# np.savetxt("sey_ha_delay.txt", sey_ha_delay, header="Delay Delay_Lower Delay_Upper")
+do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey, dynamic_range=2, name="long")
+sey_ha_delay = do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey, name="long")
+np.savetxt("sey_ha_delay.txt", sey_ha_delay, header="Delay Delay_Lower Delay_Upper")
 
 # ==============================================================================
 # RUN FOR QSO
@@ -822,7 +822,7 @@ agn110_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_110_fi
 agn_c4_radius = []
 agn_ha_radius = []
 
-lim_agn = 10000 
+lim_agn = 999999999
 
 scale_agn_100 = 1/20
 scale_agn_110 = 1/20
