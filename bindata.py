@@ -39,18 +39,21 @@ def calculate_FWHM(X,Y):
     # The first and last positive points are the edges of the peak
     return abs(X[indexes[-1]] - X[indexes[0]]) 
 
-def calculate_centroid(X,Y, threshold=0, bounds=None):
-    """Returns the centroid position, with optional minimum X threshold, and flux interval"""
-    bins = np.array(X[X>threshold])
-    vals = np.array(Y[X>threshold])
-    vals[vals<0] = 0
+def calculate_centroid(X,Y, bounds=None):
+    """Returns the centroid position, with optional flux interval"""
+    bins = X
+    vals = Y
     print('bins',bins)
     print('vals',vals)
     centroid_total = np.sum(vals)
     centroid_position = np.sum(np.multiply(bins,vals))/centroid_total
 
+    bounds = None #TEMPORARY FIX
+
     if bounds is not None:
         bound_width = bounds/2
+        bound_min = -1
+        bound_max = -1
         value_total = 0
         for index, value in enumerate(vals):
             value_total += value
@@ -120,7 +123,7 @@ def clamp(minimum, x, maximum):
 # ==============================================================================       
 class TransferFunction:    
     # FAKE INIT
-    def __init__(self, database, filename, luminosity=None, dimensions=None, template=None, template_different_line=False):
+    def __init__(self, database, filename, luminosity=None, dimensions=None, template=None, template_different_line=False, template_different_spectrum=False):
         """Initialises the TF, taking the query it is to execute, the dimensions to bin by, and the delay range bins"""
         assert dimensions is not None or template is not None,\
             "Must provide either dimensions or another TF to copy them from!"
@@ -170,7 +173,7 @@ class TransferFunction:
                 self.wavelengths(self._wave_range[0], self._wave_range[1])
             if template._line_list is not None and template_different_line is False:
                 self.lines(template._line_list)
-            if template._spectrum is not None:
+            if template._spectrum is not None and template_different_spectrum is False:
                 self.spectrum(template._spectrum)
 
         if luminosity is not None:
@@ -302,14 +305,9 @@ class TransferFunction:
             return calculate_modal_value(calculate_midpoints(self._bins_delay), np.sum(self._response_map, 1))
         else:
             return calculate_modal_value(calculate_midpoints(self._bins_delay), np.sum(self._flux, 1))
-    def centroid_delay(self, response=False):
+    def centroid_delay(self):
         """Calculates the centroid delay for the current data"""
-        if response:
-            return calculate_centroid(calculate_midpoints(self._bins_delay), np.sum(self._response_map, 1), 
-                threshold=0.8*self.modal_delay(response=True), bounds=0.9545)
-        else:
-            return calculate_centroid(calculate_midpoints(self._bins_delay), np.sum(self._flux, 1), 
-                threshold=0.8*self.modal_delay(), bounds=0.9545)
+        return calculate_centroid(calculate_midpoints(self._bins_delay), np.sum(self._flux, 1), bounds=0.9545)
 
     def run(self, response_map=None, line=None, scaling_factor=1.0, delay_dynamic_range=None, limit=None):
         """Performs a query on the photon DB and bins it"""
@@ -485,6 +483,7 @@ class TransferFunction:
        # Set the ylabel and y bins for whether it's in days or seconds
         if days:
             bins_y = np.true_divide(self._bins_delay, float(seconds_per_day))
+            data_plot *= seconds_per_day
             ax_tf.set_ylabel(r'Delay $\tau$ (days)')
             cb_label_units += r' d'
         else:
@@ -504,20 +503,25 @@ class TransferFunction:
                 data_plot[i][j] /= (width_x * x_bin_mult * width_y)
 
         # Plot the spectrum and light curve, normalised
-        data_plot_spec = np.sum(data_plot, 0) / np.abs(np.sum(data_plot))
-        data_plot_resp = np.sum(data_plot, 1) / np.abs(np.sum(data_plot))
+        data_plot_spec = np.sum(data_plot, 0)
+        data_plot_resp = np.sum(data_plot, 1)
         resp = ax_resp.plot(data_plot_resp, bins_y_midp, c='m')
-        
+        ax_spec.set_ylabel(r'$\Psi$(v) ((km s$^{-1}$)$^{-1}$)')
+        if days:
+            ax_resp.set_xlabel(r'$\Psi$($\tau$') (d^{-1})')
+        else:
+            ax_resp.set_xlabel(r'$\Psi$($\tau$') (s^{-1})')  
+
         if response_map:
             ax_spec.axhline(0, color='grey')
-            ax_resp.axvline(0, color='grey')
-            ax_spec.set_yticks([0])
-            ax_resp.set_xticks([0])
-            ax_spec.tick_params(axis='x', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
-            ax_resp.tick_params(axis='y', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
+            ax_resp.axvline(0, color='grey')        
+            #ax_spec.set_yticks([0])
+            #ax_resp.set_xticks([0])
+            #ax_spec.tick_params(axis='x', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
+            #ax_resp.tick_params(axis='y', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
             data_plot_rms = np.sum(np.sqrt(np.square(data_plot)), 0) / np.sum(np.sqrt(np.square(data_plot)))
-            rms = ax_spec.plot(bins_x_midp, data_plot_rms, c='c', label='RMS Spectrum')
-            spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='m', label='Spectrum')
+            rms = ax_spec.plot(bins_x_midp, data_plot_rms, c='c', label=r'RMS $\Psi$(v)')
+            spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='m', label=r'$\Psi$(v)')
             lg_orig = ax_spec.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
 
             #delays = self.centroid_delay(response=True)
@@ -528,10 +532,10 @@ class TransferFunction:
             #ax_resp.errorbar(delay_x, delay_y, yerr=[delay_y_min, delay_y_max], capsize=3, fmt='o', c='k')
 
         else:
-            ax_spec.tick_params(labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
-            ax_spec.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter(''))
-            ax_resp.tick_params(labelbottom='off', labelleft='off', labeltop='off', labelright='off', bottom='off', left='off')
-            ax_resp.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter(''))
+            #ax_spec.tick_params(labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
+            #ax_spec.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter(''))
+            #ax_resp.tick_params(labelbottom='off', labelleft='off', labeltop='off', labelright='off', bottom='off', left='off')
+            #ax_resp.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter(''))
             spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='m')
 
             # delays = self.centroid_delay(response=False)
@@ -734,18 +738,20 @@ kep_sey = {"angle":40, "mass":1e7, "radius":[50,2000]}
 kep_agn = {"angle":40, "mass":1e9, "radius":[50,20000]}
 
 def do_tf_plots(tf_list_inp, dynamic_range=None, keplerian=None, name=''):
+    tf_delay = []
     for tf_inp in tf_list_inp:  
         tf_inp.plot(velocity=True, keplerian=keplerian, log=False, name=(None if name is '' else name))
         tf_inp.plot(velocity=True, keplerian=keplerian, log=True,  name=name+"_log", dynamic_range=dynamic_range)
+        tf_delay.append(tf_inp.centroid_delay())
     return
 def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=''):
     rf_delay = []
     tf_mid.response_map_by_tf(tf_min, tf_mid).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"_resp_low")
-    rf_delay.append(tf_mid.centroid_delay(response=True))
+    rf_delay.append(tf_mid.modal_delay(response=True))
     tf_mid.response_map_by_tf(tf_min, tf_max).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"_resp_mid")
-    rf_delay.append(tf_mid.centroid_delay(response=True))
+    rf_delay.append(tf_mid.modal_delay(response=True))
     tf_mid.response_map_by_tf(tf_mid, tf_max).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"_resp_high")
-    rf_delay.append(tf_mid.centroid_delay(response=True))
+    rf_delay.append(tf_mid.modal_delay(response=True))
     return np.array(rf_delay,dtype='float')
 
 # # ==============================================================================
@@ -769,8 +775,8 @@ scale_sey_090 = (1/20)
 
 sey100_tf_c4 = TransferFunction(sey100_db, "sey100_c4", luminosity=1.043e44, dimensions=dims)
 sey100_tf_c4.line(416, 1548.18).spectrum(2).run(scaling_factor=scale_sey_100, delay_dynamic_range=1.0, limit=lim_sey)
-sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
-sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
+sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
+sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey)
 do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey)
@@ -780,8 +786,8 @@ do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey)
 # ------------------------------------------------------------------------------
 sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
 sey100_tf_ha.line(28, 6562.81).spectrum(2).run(scaling_factor=scale_sey_100, limit=lim_sey)
-sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
-sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
+sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
+sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey)
 do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey)
@@ -793,8 +799,8 @@ do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey)
 # ------------------------------------------------------------------------------
 sey100_tf_c4 = TransferFunction(sey100_db, "sey100_c4", luminosity=1.043e44,  dimensions=dims)
 sey100_tf_c4.line(416, 1548.18).spectrum(2).run(scaling_factor=scale_sey_100, delay_dynamic_range=1.25, limit=lim_sey)
-sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
-sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
+sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
+sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey, dynamic_range=2, name="long")
 sey_c4_delay = do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey, name="long")
@@ -805,10 +811,10 @@ np.savetxt("sey_c4_delay.txt", sey_c4_delay, header="Delay Delay_Lower Delay_Upp
 # ------------------------------------------------------------------------------
 sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
 sey100_tf_ha.line(28, 6562.81).spectrum(2).run(scaling_factor=scale_sey_100, limit=lim_sey)
-sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
+sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
 # sey095_tf_ha = TransferFunction(sey095_db, "sey095_ha", luminosity=0.9912e44, template=sey100_tf_ha).run(scaling_factor=1)
 # sey105_tf_ha = TransferFunction(sey105_db, "sey105_ha", luminosity=1.096e44,  template=sey100_tf_ha).run(scaling_factor=1)
-sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
+sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey, dynamic_range=2, name="long")
 sey_ha_delay = do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey, name="long")
