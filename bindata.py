@@ -48,8 +48,6 @@ def calculate_centroid(X,Y, bounds=None):
     centroid_total = np.sum(vals)
     centroid_position = np.sum(np.multiply(bins,vals))/centroid_total
 
-    bounds = None #TEMPORARY FIX
-
     if bounds is not None:
         bound_width = bounds/2
         bound_min = -1
@@ -508,9 +506,9 @@ class TransferFunction:
         resp = ax_resp.plot(data_plot_resp, bins_y_midp, c='m')
         ax_spec.set_ylabel(r'$\Psi$(v) ((km s$^{-1}$)$^{-1}$)')
         if days:
-            ax_resp.set_xlabel(r'$\Psi$($\tau$') (d^{-1})')
+            ax_resp.set_xlabel(r'$\Psi$($\tau$) (d^{-1})')
         else:
-            ax_resp.set_xlabel(r'$\Psi$($\tau$') (s^{-1})')  
+            ax_resp.set_xlabel(r'$\Psi$($\tau$) (s^{-1})')
 
         if response_map:
             ax_spec.axhline(0, color='grey')
@@ -565,7 +563,7 @@ class TransferFunction:
         if response_map:
             cb_max = np.amax([cb_max, np.abs(cb_min)])
             cb_min = -cb_max
-            cb_map = 'seismic'
+            cb_map = 'RdBu_r' #'seismic'
 
         # Normalise or rescale the data. If doing neither, put units on cb.
         if normalised:
