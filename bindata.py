@@ -27,6 +27,7 @@ from evtk.hl import gridToVTK
 seconds_per_day = 60*60*24
 batch_size = 1e8
 
+calibration_factor = None
 
 # ==============================================================================       
 def calculate_FWHM(X,Y):
@@ -254,7 +255,7 @@ class TransferFunction:
         self._query=self._query.filter(args)
         return self
 
-    def response_map_by_tf(self, low_state, high_state, plot=False):
+    def response_map_by_tf(self, low_state, high_state, plot=False, cf_min=1, cf_max=1):
         """Creates a response map from two other transfer functions, to be applied during plotting"""
         # The other two TFs ***must*** have identical bins and both provide ionising luminosity information
         assert self._flux is not None,\
@@ -276,9 +277,13 @@ class TransferFunction:
         assert high_state._luminosity >= self._luminosity,\
             "High state ionising luminosity lower than target TF ionising luminosity!"
 
-        # If that is true, the map is trivial to construct. We divide the difference in TFs by the luminosity difference
         luminosity_difference = high_state._luminosity - low_state._luminosity
-        response_map = ((high_state._flux*high_state._luminosity) - (low_state._flux*low_state._luminosity)) / luminosity_difference
+
+        # If that is true, the map is trivial to construct. We divide the difference in TFs by the luminosity difference
+        response_map = ((high_state._flux*high_state._luminosity*cf_max) - (low_state._flux*low_state._luminosity*cf_min)) / luminosity_difference
+
+        #print("Response mapping from TFs with total values {:.2e}, {:.2e}, {:.2e}".format(total_low, total_mid, total_high))
+
         self._response_map = response_map
         return self
 
@@ -435,6 +440,7 @@ class TransferFunction:
         fig, ((ax_spec, ax_none), (ax_tf, ax_resp)) = plt.subplots(2,2,sharex='col', sharey='row',
             gridspec_kw={'width_ratios':[3,1], 'height_ratios':[1,3]})
         ax_none.axis('off')
+        ax_resp.invert_xaxis()
         fig.subplots_adjust(hspace=0, wspace=0)
 
         # Set the properties that depend on log and wave/velocity status
@@ -504,11 +510,14 @@ class TransferFunction:
         data_plot_spec = np.sum(data_plot, 0)
         data_plot_resp = np.sum(data_plot, 1)
         resp = ax_resp.plot(data_plot_resp, bins_y_midp, c='m')
-        ax_spec.set_ylabel(r'$\Psi$(v) ((km s$^{-1}$)$^{-1}$)')
+        ax_spec.set_ylabel(r'$\Psi$(v) / km s$^{-1}$')
         if days:
-            ax_resp.set_xlabel(r'$\Psi$($\tau$) (d^{-1})')
+            ax_resp.set_xlabel(r'$\Psi$($\tau$) / d')
         else:
-            ax_resp.set_xlabel(r'$\Psi$($\tau$) (s^{-1})')
+            ax_resp.set_xlabel(r'$\Psi$($\tau$) / s')
+        ax_resp_labels = ax_resp.get_xticklabels()
+        ax_resp_labels[ax_resp_labels == 0] = '0'
+        ax_resp.set_xticklabels(ax_resp_labels)
 
         if response_map:
             ax_spec.axhline(0, color='grey')
@@ -517,7 +526,7 @@ class TransferFunction:
             #ax_resp.set_xticks([0])
             #ax_spec.tick_params(axis='x', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
             #ax_resp.tick_params(axis='y', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
-            data_plot_rms = np.sum(np.sqrt(np.square(data_plot)), 0) / np.sum(np.sqrt(np.square(data_plot)))
+            data_plot_rms = np.sqrt(np.sum(np.square(data_plot), 0) / self._dimensions[0])
             rms = ax_spec.plot(bins_x_midp, data_plot_rms, c='c', label=r'RMS $\Psi$(v)')
             spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='m', label=r'$\Psi$(v)')
             lg_orig = ax_spec.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
@@ -576,10 +585,10 @@ class TransferFunction:
             cb_label_scale = r""
 
         # Plot the main colourplot for the transfer function
-        tf = None
         tf = ax_tf.pcolor(bins_x, bins_y, data_plot,
                           vmin=cb_min, vmax=cb_max, cmap=cb_map)
-        ax_tf.set_ylim(top=bins_y[-1])
+        ax_tf.set_ylim(bottom=bins_y[0], top=bins_y[-1])
+        ax_tf.set_xlim(left=bins_x[0], right=bins_x[-1])
         ax_tf.set_aspect('auto')
 
         # Add lines for keplerian rotational outflows
@@ -735,35 +744,59 @@ dims = [50, 50]
 kep_sey = {"angle":40, "mass":1e7, "radius":[50,2000]}
 kep_agn = {"angle":40, "mass":1e9, "radius":[50,20000]}
 
-def do_tf_plots(tf_list_inp, dynamic_range=None, keplerian=None, name=''):
+def do_tf_plots(tf_list_inp, dynamic_range=None, keplerian=None, name=None):
     tf_delay = []
     for tf_inp in tf_list_inp:  
-        tf_inp.plot(velocity=True, keplerian=keplerian, log=False, name=(None if name is '' else name))
-        tf_inp.plot(velocity=True, keplerian=keplerian, log=True,  name=name+"_log", dynamic_range=dynamic_range)
+        tf_inp.plot(velocity=True, keplerian=keplerian, log=False, name=name)
+        tf_inp.plot(velocity=True, keplerian=keplerian, log=True,  name=('log' if name is None else name+"_log"), dynamic_range=dynamic_range)
         tf_delay.append(tf_inp.centroid_delay())
     return
-def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=''):
+def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, calibration_factor=None):
+    rf_min = None
+    rf_med = None
+    rf_max = None
+
     rf_delay = []
-    tf_mid.response_map_by_tf(tf_min, tf_mid).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"_resp_low")
-    rf_delay.append(tf_mid.modal_delay(response=True))
-    tf_mid.response_map_by_tf(tf_min, tf_max).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"_resp_mid")
-    rf_delay.append(tf_mid.modal_delay(response=True))
-    tf_mid.response_map_by_tf(tf_mid, tf_max).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"_resp_high")
-    rf_delay.append(tf_mid.modal_delay(response=True))
-    return np.array(rf_delay,dtype='float')
+    if name is not None:
+        name += '_'
+    else:
+        name = ''
+    
+    total_min  = np.sum(tf_min._flux).item()
+    total_mid  = np.sum(tf_mid._flux).item()
+    total_max = np.sum(tf_max._flux).item()
+
+    calibration_factor = total_mid / ((total_min + total_max) / 2)
+    print('FROM:',total_min, total_mid, total_max)
+    print('CALIBRATION IS:',calibration_factor)
+    print('RESULTS ARE:',total_min*calibration_factor, total_mid, total_max*calibration_factor)
+
+    tf_mid.response_map_by_tf(tf_min, tf_max,cf_min=1, cf_max=1).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"resp_mid")
+    rf_mid = tf_mid.modal_delay(response=True)
+    
+    tf_mid.response_map_by_tf(tf_min, tf_mid,cf_min=calibration_factor, cf_max=1).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"resp_low")
+    rf_min = tf_mid.modal_delay(response=True)
+    tf_mid.response_map_by_tf(tf_mid, tf_max,cf_min=1, cf_max=calibration_factor).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"resp_high")
+    rf_max = tf_mid.modal_delay(response=True)
+    return np.array([rf_min, rf_med, rf_max],dtype='float')
 
 # # ==============================================================================
 # # RUN FOR SEYFERT
 # # ==============================================================================
-sey100_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100", "root", "password")
+sey100_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100_quarter", "root", "password")
 sey090_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
 sey110_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
 
-lim_sey = 9999999999
+lim_sey = 99999999999
 
-scale_sey_100 = (1/20)
+scale_sey_100 = (1/20)/(10/40)
 scale_sey_110 = (1/20)
 scale_sey_090 = (1/20)
+
+wave_ha = 6562.81
+wave_ha = 6562
+wave_c4 = 1548.18
+
 
 # ==============================================================================
 # RUN FOR SHORT TIMESCALES
@@ -772,23 +805,23 @@ scale_sey_090 = (1/20)
 # ------------------------------------------------------------------------------
 
 sey100_tf_c4 = TransferFunction(sey100_db, "sey100_c4", luminosity=1.043e44, dimensions=dims)
-sey100_tf_c4.line(416, 1548.18).spectrum(2).run(scaling_factor=scale_sey_100, delay_dynamic_range=1.0, limit=lim_sey)
+sey100_tf_c4.line(416, wave_c4).spectrum(0).run(scaling_factor=scale_sey_100, delay_dynamic_range=1.25, limit=lim_sey)
 sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
 sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey)
-do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey)
+do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey,calibration_factor=calibration_factor)
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
 # ------------------------------------------------------------------------------
 sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
-sey100_tf_ha.line(28, 6562.81).spectrum(2).run(scaling_factor=scale_sey_100, limit=lim_sey)
+sey100_tf_ha.line(28, wave_ha).spectrum(0).run(scaling_factor=scale_sey_100, limit=lim_sey)
 sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
 sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey)
-do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey)
+do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey,calibration_factor=calibration_factor)
 
 # ==============================================================================
 # RUN FOR LONG TIMESCALES
@@ -796,7 +829,7 @@ do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey)
 # RUN FOR C4
 # ------------------------------------------------------------------------------
 sey100_tf_c4 = TransferFunction(sey100_db, "sey100_c4", luminosity=1.043e44,  dimensions=dims)
-sey100_tf_c4.line(416, 1548.18).spectrum(2).run(scaling_factor=scale_sey_100, delay_dynamic_range=1.25, limit=lim_sey)
+sey100_tf_c4.line(416, wave_c4).spectrum(0).run(scaling_factor=scale_sey_100, delay_dynamic_range=1.5, limit=lim_sey)
 sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
 sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
@@ -808,7 +841,7 @@ np.savetxt("sey_c4_delay.txt", sey_c4_delay, header="Delay Delay_Lower Delay_Upp
 # RUN FOR Ha
 # ------------------------------------------------------------------------------
 sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
-sey100_tf_ha.line(28, 6562.81).spectrum(2).run(scaling_factor=scale_sey_100, limit=lim_sey)
+sey100_tf_ha.line(28, wave_ha).spectrum(0).run(scaling_factor=scale_sey_100, limit=lim_sey)
 sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
 # sey095_tf_ha = TransferFunction(sey095_db, "sey095_ha", luminosity=0.9912e44, template=sey100_tf_ha).run(scaling_factor=1)
 # sey105_tf_ha = TransferFunction(sey105_db, "sey105_ha", luminosity=1.096e44,  template=sey100_tf_ha).run(scaling_factor=1)
@@ -817,6 +850,8 @@ sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  te
 do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey, dynamic_range=2, name="long")
 sey_ha_delay = do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey, name="long")
 np.savetxt("sey_ha_delay.txt", sey_ha_delay, header="Delay Delay_Lower Delay_Upper")
+
+sys.exit(1)
 
 # ==============================================================================
 # RUN FOR QSO
@@ -837,7 +872,7 @@ scale_agn_090 = 1/20
 # RUN FOR C4
 # ------------------------------------------------------------------------------
 agn100_tf_c4 = TransferFunction(agn100_db, "agn100_c4", luminosity=1.043e46, dimensions=dims)
-agn100_tf_c4.line(445, 1548.18).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=1, limit=lim_agn)
+agn100_tf_c4.line(445, wave_c4).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=1, limit=lim_agn)
 agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110, limit=lim_agn)
 agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=scale_agn_090, limit=lim_agn)
 
@@ -848,7 +883,7 @@ do_rf_plots(agn090_tf_c4, agn100_tf_c4, agn110_tf_c4, keplerian=kep_agn)
 # RUN FOR Ha
 # ------------------------------------------------------------------------------
 agn100_tf_ha = TransferFunction(agn100_db, "agn100_ha", luminosity=1.043e46,  template=agn100_tf_c4, template_different_line=True)
-agn100_tf_ha.line(44, 6562.81).run(scaling_factor=scale_agn_100, limit=lim_agn)
+agn100_tf_ha.line(44, wave_ha).run(scaling_factor=scale_agn_100, limit=lim_agn)
 agn090_tf_ha = TransferFunction(agn090_db, "agn090_ha", luminosity=0.9391e46, template=agn100_tf_ha).run(scaling_factor=scale_agn_090, limit=lim_agn)
 agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=scale_agn_110, limit=lim_agn)#, limit=lim_agn)
 
@@ -861,7 +896,7 @@ agn_ha_delay = do_rf_plots(agn090_tf_ha, agn100_tf_ha, agn110_tf_ha, keplerian=k
 # RUN FOR C4
 # ------------------------------------------------------------------------------
 agn100_tf_c4 = TransferFunction(agn100_db, "agn100_c4", luminosity=1.043e46,  dimensions=dims)
-agn100_tf_c4.line(445, 1548.18).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=2, limit=lim_agn)
+agn100_tf_c4.line(445, wave_c4).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=2, limit=lim_agn)
 agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=scale_agn_090, limit=lim_agn)
 agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110, limit=lim_agn)#, limit=lim_agn)
 
@@ -873,7 +908,7 @@ np.savetxt("agn_c4_delay.txt", agn_c4_delay, header="Delay Delay_Lower Delay_Upp
 # RUN FOR Ha
 # ------------------------------------------------------------------------------
 agn100_tf_ha = TransferFunction(agn100_db, "agn100_ha", luminosity=1.043e46,  template=agn100_tf_c4, template_different_line=True)
-agn100_tf_ha.line(44, 6562.81).run(scaling_factor=scale_agn_100, limit=lim_agn)
+agn100_tf_ha.line(44, wave_ha).run(scaling_factor=scale_agn_100, limit=lim_agn)
 agn090_tf_ha = TransferFunction(agn090_db, "agn090_ha", luminosity=0.9391e46, template=agn100_tf_ha).run(scaling_factor=scale_agn_090, limit=lim_agn)
 agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=scale_agn_110, limit=lim_agn)#, limit=lim_agn)
 
