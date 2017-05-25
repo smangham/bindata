@@ -12,6 +12,7 @@ import astropy.constants as apc
 import time
 import sys
 import scipy
+import matplotlib.ticker as ti
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import sqlalchemy
@@ -27,9 +28,7 @@ from evtk.hl import gridToVTK
 seconds_per_day = 60*60*24
 batch_size = 1e8
 
-calibration_factor = None
-
-# ==============================================================================       
+# ==============================================================================
 def calculate_FWHM(X,Y):
     """Calculate FWHM from arrays"""
     # Taken from http://stackoverflow.com/questions/10582795/finding-the-full-width-half-maximum-of-a-peak
@@ -44,8 +43,6 @@ def calculate_centroid(X,Y, bounds=None):
     """Returns the centroid position, with optional flux interval"""
     bins = X
     vals = Y
-    print('bins',bins)
-    print('vals',vals)
     centroid_total = np.sum(vals)
     centroid_position = np.sum(np.multiply(bins,vals))/centroid_total
 
@@ -65,10 +62,8 @@ def calculate_centroid(X,Y, bounds=None):
             if value_total/centroid_total <= 0.5-bound_width:
                 bound_min = bins[len(bins)-1-index]
                 break
-        print(centroid_position, bound_min, bound_max)
         return centroid_position, bound_min, bound_max
     else:
-        print(centroid_position)
         return centroid_position
 
 def calculate_modal_value(X,Y):
@@ -418,6 +413,8 @@ class TransferFunction:
         assert self._bins_wave is not None,\
             "You must run the TF query with '.run()' before plotting it!"
 
+        matplotlib.rcParams["text.usetex"] = "True" 
+
         start = time.clock()
         if name is not None:
             print("Plotting to file '"+self._filename+"_"+name+".eps'...")
@@ -509,49 +506,27 @@ class TransferFunction:
         # Plot the spectrum and light curve, normalised
         data_plot_spec = np.sum(data_plot, 0)
         data_plot_resp = np.sum(data_plot, 1)
-        resp = ax_resp.plot(data_plot_resp, bins_y_midp, c='m')
-        ax_spec.set_ylabel(r'$\Psi$(v) / km s$^{-1}$')
+        exponent_spec = np.floor(np.log10(np.amax(data_plot_spec)))
+        exponent_resp = np.floor(np.log10(np.amax(data_plot_resp)))
+        exponent_resp_text = "{}{:.0f}{}".format("{",exponent_resp,"}")
+        exponent_spec_text = "{}{:.0f}{}".format("{",exponent_spec,"}")
+
+        resp = ax_resp.plot(data_plot_resp/(10**exponent_resp), bins_y_midp, c='m')
+        ax_spec.set_ylabel(r'$\Psi$(v) $10^{}$ / km s$^{}$'.format(exponent_spec_text, "{-1}"))
         if days:
-            ax_resp.set_xlabel(r'$\Psi$($\tau$) / d')
+            ax_resp.set_xlabel(r'$\Psi$($\tau$) $10^{}$ / d'.format(exponent_resp_text))
         else:
-            ax_resp.set_xlabel(r'$\Psi$($\tau$) / s')
-        ax_resp_labels = ax_resp.get_xticklabels()
-        ax_resp_labels[ax_resp_labels == 0] = '0'
-        ax_resp.set_xticklabels(ax_resp_labels)
+            ax_resp.set_xlabel(r'$\Psi$($\tau$) $10^{}$ / s'.format(exponent_resp_text))
 
         if response_map:
             ax_spec.axhline(0, color='grey')
             ax_resp.axvline(0, color='grey')        
-            #ax_spec.set_yticks([0])
-            #ax_resp.set_xticks([0])
-            #ax_spec.tick_params(axis='x', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
-            #ax_resp.tick_params(axis='y', labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
             data_plot_rms = np.sqrt(np.sum(np.square(data_plot), 0) / self._dimensions[0])
-            rms = ax_spec.plot(bins_x_midp, data_plot_rms, c='c', label=r'RMS $\Psi$(v)')
-            spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='m', label=r'$\Psi$(v)')
+            rms = ax_spec.plot(bins_x_midp, data_plot_rms/(10**exponent_spec), c='c', label=r'RMS $\Psi$(v)')
+            spec = ax_spec.plot(bins_x_midp, data_plot_spec/(10**exponent_spec), c='m', label=r'$\Psi$(v)')
             lg_orig = ax_spec.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
-
-            #delays = self.centroid_delay(response=True)
-            #delay_x = np.asarray([np.amax(data_plot_resp)/2])
-            #delay_y = np.asarray([delays[0]])/seconds_per_day
-            #delay_y_min = np.asarray([delays[1]])/seconds_per_day
-            #delay_y_max = np.asarray([delays[2]])/seconds_per_day
-            #ax_resp.errorbar(delay_x, delay_y, yerr=[delay_y_min, delay_y_max], capsize=3, fmt='o', c='k')
-
         else:
-            #ax_spec.tick_params(labelbottom='off', labelleft='off', labeltop='off', labelright='off', left='off', bottom='off')
-            #ax_spec.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter(''))
-            #ax_resp.tick_params(labelbottom='off', labelleft='off', labeltop='off', labelright='off', bottom='off', left='off')
-            #ax_resp.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter(''))
-            spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='m')
-
-            # delays = self.centroid_delay(response=False)
-            # delay_x = np.asarray([np.amax(data_plot_resp)/2])
-            # delay_y = np.asarray([delays[0]])/seconds_per_day
-            # delay_y_min = np.asarray([delays[1]])/seconds_per_day
-            # delay_y_max = np.asarray([delays[2]])/seconds_per_day
-            # ax_resp.errorbar(delay_x, delay_y, yerr=[delay_y_min, delay_y_max], capsize=3, fmt='o', c='k')
-            
+            spec = ax_spec.plot(bins_x_midp, data_plot_spec/(10**exponent_spec), c='m')
 
         # If this is a log plot, take log and correct label and limits
         if log:
@@ -590,6 +565,15 @@ class TransferFunction:
         ax_tf.set_ylim(bottom=bins_y[0], top=bins_y[-1])
         ax_tf.set_xlim(left=bins_x[0], right=bins_x[-1])
         ax_tf.set_aspect('auto')
+
+        if response_map:
+            ratio = np.sum(self._response_map)/np.sum(self._flux)
+            ratio_exp = np.floor(np.log10(ratio))
+            ratio_text_exp = r"{}{:.0f}{}".format("{",ratio_exp,"}")
+            ratio_text = '\n'
+            ratio_text += r"${:.2f}\times 10^{}$".format(ratio/(10**ratio_exp), ratio_text_exp)
+            ax_tf.text(0.05, 0.95, r"$\frac{\Delta L}{L}/\frac{\Delta C}{C}=$"+ratio_text,
+                transform=ax_tf.transAxes, fontsize=10, verticalalignment='top', horizontalalignment='left')
 
         # Add lines for keplerian rotational outflows
         if keplerian is not None:
@@ -729,29 +713,24 @@ class Photon(Base):
     #__table_args__ = (sqlalchemy.Index('spec_res', "Spectrum", "Resonance"),)
 
 
-# agn_spec0_engine, agn_spec0_db = open_database("/Users/swm1n12/python_runs/paper1_fiducial/agn_obs_0", "root", "password")
-# agn_spec1_engine, agn_spec1_db = open_database("/Users/swm1n12/python_runs/paper1_fiducial/agn_obs_1", "root", "password")
-# agn_spec2_engine, agn_spec2_db = open_database("/Users/swm1n12/python_runs/paper1_fiducial/agn_obs_2", "root", "password")
-# agn_spec3_engine, agn_spec3_db = open_database("/Users/swm1n12/python_runs/paper1_fiducial/agn_obs_3", "root", "password")
-# agn_spec4_engine, agn_spec4_db = open_database("/Users/swm1n12/python_runs/paper1_fiducial/agn_obs_4", "root", "password")
-# agn_spec5_engine, agn_spec5_db = open_database("/Users/swm1n12/python_runs/paper1_fiducial/agn_obs_5", "root", "password")
-
-
 #sey095_engine, sey095_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_095", "root", "password")
 #sey105_engine, sey105_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_105", "root", "password")
 
 dims = [50, 50]
 kep_sey = {"angle":40, "mass":1e7, "radius":[50,2000]}
-kep_agn = {"angle":40, "mass":1e9, "radius":[50,20000]}
+kep_qso = {"angle":40, "mass":1e9, "radius":[50,20000]}
 
-def do_tf_plots(tf_list_inp, dynamic_range=None, keplerian=None, name=None):
+def do_tf_plots(tf_list_inp, dynamic_range=None, keplerian=None, name=None, file=None):
     tf_delay = []
     for tf_inp in tf_list_inp:  
         tf_inp.plot(velocity=True, keplerian=keplerian, log=False, name=name)
         tf_inp.plot(velocity=True, keplerian=keplerian, log=True,  name=('log' if name is None else name+"_log"), dynamic_range=dynamic_range)
         tf_delay.append(tf_inp.centroid_delay())
-    return
-def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, calibration_factor=None):
+
+    if file is not None:
+        np.savetxt(file+"_tf_delay.txt", np.array(tf_delay,dtype='float'), header="Delay Delay_Lower Delay_Upper")
+
+def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, file=None):
     rf_min = None
     rf_med = None
     rf_max = None
@@ -767,9 +746,9 @@ def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, calibration_f
     total_max = np.sum(tf_max._flux).item()
 
     calibration_factor = total_mid / ((total_min + total_max) / 2)
-    print('FROM:',total_min, total_mid, total_max)
-    print('CALIBRATION IS:',calibration_factor)
-    print('RESULTS ARE:',total_min*calibration_factor, total_mid, total_max*calibration_factor)
+    # print('FROM:',total_min, total_mid, total_max)
+    # print('CALIBRATION IS:',calibration_factor)
+    # print('RESULTS ARE:',total_min*calibration_factor, total_mid, total_max*calibration_factor)
 
     tf_mid.response_map_by_tf(tf_min, tf_max,cf_min=1, cf_max=1).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"resp_mid")
     rf_mid = tf_mid.modal_delay(response=True)
@@ -778,7 +757,9 @@ def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, calibration_f
     rf_min = tf_mid.modal_delay(response=True)
     tf_mid.response_map_by_tf(tf_mid, tf_max,cf_min=1, cf_max=calibration_factor).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"resp_high")
     rf_max = tf_mid.modal_delay(response=True)
-    return np.array([rf_min, rf_med, rf_max],dtype='float')
+
+    if file is not None:
+        np.savetxt(file+"_rf_delay.txt", np.array([rf_min, rf_med, rf_max],dtype='float'), header="Delay Delay_Lower Delay_Upper") 
 
 # # ==============================================================================
 # # RUN FOR SEYFERT
@@ -787,7 +768,7 @@ sey100_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100_q
 sey090_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
 sey110_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
 
-lim_sey = 99999999999
+lim_sey = 999999999
 
 scale_sey_100 = (1/20)/(10/40)
 scale_sey_110 = (1/20)
@@ -796,7 +777,6 @@ scale_sey_090 = (1/20)
 wave_ha = 6562.81
 wave_ha = 6562
 wave_c4 = 1548.18
-
 
 # ==============================================================================
 # RUN FOR SHORT TIMESCALES
@@ -810,7 +790,7 @@ sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, te
 sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey)
-do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey,calibration_factor=calibration_factor)
+do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey)
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
@@ -821,7 +801,7 @@ sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, te
 sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey)
-do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey,calibration_factor=calibration_factor)
+do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey)
 
 # ==============================================================================
 # RUN FOR LONG TIMESCALES
@@ -833,9 +813,8 @@ sey100_tf_c4.line(416, wave_c4).spectrum(0).run(scaling_factor=scale_sey_100, de
 sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
 sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
-do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey, dynamic_range=2, name="long")
-sey_c4_delay = do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey, name="long")
-np.savetxt("sey_c4_delay.txt", sey_c4_delay, header="Delay Delay_Lower Delay_Upper")
+do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey, dynamic_range=2, name="long", file='sey_c4')
+sey_c4_delay = do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey, name="long", file='sey_c4')
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
@@ -843,79 +822,73 @@ np.savetxt("sey_c4_delay.txt", sey_c4_delay, header="Delay Delay_Lower Delay_Upp
 sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
 sey100_tf_ha.line(28, wave_ha).spectrum(0).run(scaling_factor=scale_sey_100, limit=lim_sey)
 sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
-# sey095_tf_ha = TransferFunction(sey095_db, "sey095_ha", luminosity=0.9912e44, template=sey100_tf_ha).run(scaling_factor=1)
-# sey105_tf_ha = TransferFunction(sey105_db, "sey105_ha", luminosity=1.096e44,  template=sey100_tf_ha).run(scaling_factor=1)
 sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
-do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey, dynamic_range=2, name="long")
-sey_ha_delay = do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey, name="long")
-np.savetxt("sey_ha_delay.txt", sey_ha_delay, header="Delay Delay_Lower Delay_Upper")
-
+do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey, dynamic_range=2, name="long", file='sey_ha')
+sey_ha_delay = do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey, name="long", file='sey_ha')
 sys.exit(1)
 
 # ==============================================================================
 # RUN FOR QSO
 # ==============================================================================
-agn100_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_100_indexed", "root", "password")
-agn090_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_090", "root", "password")
-agn110_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_110_fillet", "root", "password")
+qso100_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_100_indexed", "root", "password")
+qso090_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_090", "root", "password")
+qso110_db = open_database("/Users/swm1n12/python_runs/paper1_agn_resp/agn_110_fillet", "root", "password")
 
-lim_agn = 9999999999
+lim_qso = 9999999999
 
-scale_agn_100 = 1/20
-scale_agn_110 = 1/20
-scale_agn_090 = 1/20
+scale_qso_100 = 1/20
+scale_qso_110 = 1/20
+scale_qso_090 = 1/20
 
 # ==============================================================================
 # RUN FOR SHORT TIMESCALES
 # ==============================================================================
 # RUN FOR C4
 # ------------------------------------------------------------------------------
-agn100_tf_c4 = TransferFunction(agn100_db, "agn100_c4", luminosity=1.043e46, dimensions=dims)
-agn100_tf_c4.line(445, wave_c4).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=1, limit=lim_agn)
-agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110, limit=lim_agn)
-agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=scale_agn_090, limit=lim_agn)
+qso100_tf_c4 = TransferFunction(qso100_db, "qso100_c4", luminosity=1.043e46, dimensions=dims)
+qso100_tf_c4.line(445, wave_c4).spectrum(2).run(scaling_factor=scale_qso_100, delay_dynamic_range=1, limit=lim_qso)
+qso110_tf_c4 = TransferFunction(qso110_db, "qso110_c4", luminosity=1.148e46,  template=qso100_tf_c4).run(scaling_factor=scale_qso_110, limit=lim_qso)
+qso090_tf_c4 = TransferFunction(qso090_db, "qso090_c4", luminosity=0.9391e46, template=qso100_tf_c4).run(scaling_factor=scale_qso_090, limit=lim_qso)
 
-do_tf_plots([agn090_tf_c4, agn100_tf_c4, agn110_tf_c4], keplerian=kep_agn, dynamic_range=2)
-do_rf_plots(agn090_tf_c4, agn100_tf_c4, agn110_tf_c4, keplerian=kep_agn)
+do_tf_plots([qso090_tf_c4, qso100_tf_c4, qso110_tf_c4], keplerian=kep_qso, dynamic_range=2)
+do_rf_plots(qso090_tf_c4, qso100_tf_c4, qso110_tf_c4, keplerian=kep_qso)
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
 # ------------------------------------------------------------------------------
-agn100_tf_ha = TransferFunction(agn100_db, "agn100_ha", luminosity=1.043e46,  template=agn100_tf_c4, template_different_line=True)
-agn100_tf_ha.line(44, wave_ha).run(scaling_factor=scale_agn_100, limit=lim_agn)
-agn090_tf_ha = TransferFunction(agn090_db, "agn090_ha", luminosity=0.9391e46, template=agn100_tf_ha).run(scaling_factor=scale_agn_090, limit=lim_agn)
-agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=scale_agn_110, limit=lim_agn)#, limit=lim_agn)
+qso100_tf_ha = TransferFunction(qso100_db, "qso100_ha", luminosity=1.043e46,  template=qso100_tf_c4, template_different_line=True)
+qso100_tf_ha.line(44, wave_ha).run(scaling_factor=scale_qso_100, limit=lim_qso)
+qso090_tf_ha = TransferFunction(qso090_db, "qso090_ha", luminosity=0.9391e46, template=qso100_tf_ha).run(scaling_factor=scale_qso_090, limit=lim_qso)
+qso110_tf_ha = TransferFunction(qso110_db, "qso110_ha", luminosity=1.148e46,  template=qso100_tf_ha).run(scaling_factor=scale_qso_110, limit=lim_qso)#, limit=lim_qso)
 
-do_tf_plots([agn090_tf_ha, agn100_tf_ha, agn110_tf_ha], keplerian=kep_agn, dynamic_range=2)
-agn_ha_delay = do_rf_plots(agn090_tf_ha, agn100_tf_ha, agn110_tf_ha, keplerian=kep_agn)
+do_tf_plots([qso090_tf_ha, qso100_tf_ha, qso110_tf_ha], keplerian=kep_qso, dynamic_range=2)
+do_rf_plots(qso090_tf_ha, qso100_tf_ha, qso110_tf_ha, keplerian=kep_qso)
 
 # ==============================================================================
 # RUN FOR LONG TIMESCALES
 # ==============================================================================
 # RUN FOR C4
 # ------------------------------------------------------------------------------
-agn100_tf_c4 = TransferFunction(agn100_db, "agn100_c4", luminosity=1.043e46,  dimensions=dims)
-agn100_tf_c4.line(445, wave_c4).spectrum(2).run(scaling_factor=scale_agn_100, delay_dynamic_range=2, limit=lim_agn)
-agn090_tf_c4 = TransferFunction(agn090_db, "agn090_c4", luminosity=0.9391e46, template=agn100_tf_c4).run(scaling_factor=scale_agn_090, limit=lim_agn)
-agn110_tf_c4 = TransferFunction(agn110_db, "agn110_c4", luminosity=1.148e46,  template=agn100_tf_c4).run(scaling_factor=scale_agn_110, limit=lim_agn)#, limit=lim_agn)
+qso100_tf_c4 = TransferFunction(qso100_db, "qso100_c4", luminosity=1.043e46,  dimensions=dims)
+qso100_tf_c4.line(445, wave_c4).spectrum(2).run(scaling_factor=scale_qso_100, delay_dynamic_range=2, limit=lim_qso)
+qso090_tf_c4 = TransferFunction(qso090_db, "qso090_c4", luminosity=0.9391e46, template=qso100_tf_c4).run(scaling_factor=scale_qso_090, limit=lim_qso)
+qso110_tf_c4 = TransferFunction(qso110_db, "qso110_c4", luminosity=1.148e46,  template=qso100_tf_c4).run(scaling_factor=scale_qso_110, limit=lim_qso)#, limit=lim_qso)
 
-do_tf_plots([agn090_tf_c4, agn100_tf_c4, agn110_tf_c4], keplerian=kep_agn, dynamic_range=3, name="long")
-agn_c4_delay = do_rf_plots(agn090_tf_c4, agn100_tf_c4, agn110_tf_c4, keplerian=kep_agn, name="long")
-np.savetxt("agn_c4_delay.txt", agn_c4_delay, header="Delay Delay_Lower Delay_Upper")
+do_tf_plots([qso090_tf_c4, qso100_tf_c4, qso110_tf_c4], keplerian=kep_qso, dynamic_range=3, name="long", file='qso_c4')
+qso_c4_delay = do_rf_plots(qso090_tf_c4, qso100_tf_c4, qso110_tf_c4, keplerian=kep_qso, name="long", file='qso_c4')
+np.savetxt("qso_c4_delay.txt", qso_c4_delay, header="Delay Delay_Lower Delay_Upper")
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
 # ------------------------------------------------------------------------------
-agn100_tf_ha = TransferFunction(agn100_db, "agn100_ha", luminosity=1.043e46,  template=agn100_tf_c4, template_different_line=True)
-agn100_tf_ha.line(44, wave_ha).run(scaling_factor=scale_agn_100, limit=lim_agn)
-agn090_tf_ha = TransferFunction(agn090_db, "agn090_ha", luminosity=0.9391e46, template=agn100_tf_ha).run(scaling_factor=scale_agn_090, limit=lim_agn)
-agn110_tf_ha = TransferFunction(agn110_db, "agn110_ha", luminosity=1.148e46,  template=agn100_tf_ha).run(scaling_factor=scale_agn_110, limit=lim_agn)#, limit=lim_agn)
+qso100_tf_ha = TransferFunction(qso100_db, "qso100_ha", luminosity=1.043e46,  template=qso100_tf_c4, template_different_line=True)
+qso100_tf_ha.line(44, wave_ha).run(scaling_factor=scale_qso_100, limit=lim_qso)
+qso090_tf_ha = TransferFunction(qso090_db, "qso090_ha", luminosity=0.9391e46, template=qso100_tf_ha).run(scaling_factor=scale_qso_090, limit=lim_qso)
+qso110_tf_ha = TransferFunction(qso110_db, "qso110_ha", luminosity=1.148e46,  template=qso100_tf_ha).run(scaling_factor=scale_qso_110, limit=lim_qso)#, limit=lim_qso)
 
-do_tf_plots([agn090_tf_ha, agn100_tf_ha, agn110_tf_ha], keplerian=kep_agn, dynamic_range=3, name="long")
-do_rf_plots(agn090_tf_ha, agn100_tf_ha, agn110_tf_ha, keplerian=kep_agn, name="long")
-np.savetxt("agn_ha_delay.txt", agn_ha_delay, header="Delay Delay_Lower Delay_Upper")
-
+do_tf_plots([qso090_tf_ha, qso100_tf_ha, qso110_tf_ha], keplerian=kep_qso, dynamic_range=3, name="long", file='qso_ha')
+do_rf_plots(qso090_tf_ha, qso100_tf_ha, qso110_tf_ha, keplerian=kep_qso, name="long", file='qso_ha')
 sys.exit(1)
 
 def cart2cyl(x,y):
