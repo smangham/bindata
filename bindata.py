@@ -414,7 +414,7 @@ class TransferFunction:
             "You must run the TF query with '.run()' before plotting it!"
 
         matplotlib.rcParams["text.usetex"] = "True" 
-        matplotlib.rcParams.update({'font.size': 22})
+        matplotlib.rcParams.update({'font.size': 16})
 
         start = time.clock()
         if name is not None:
