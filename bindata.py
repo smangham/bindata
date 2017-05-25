@@ -771,7 +771,7 @@ sey100_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100_q
 sey090_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
 sey110_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
 
-lim_sey = 999
+lim_sey = 99999999999
 
 scale_sey_100 = (1/20)/(10/40)
 scale_sey_110 = (1/20)
