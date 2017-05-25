@@ -414,6 +414,7 @@ class TransferFunction:
             "You must run the TF query with '.run()' before plotting it!"
 
         matplotlib.rcParams["text.usetex"] = "True" 
+        matplotlib.rcParams.update({'font.size': 22})
 
         start = time.clock()
         if name is not None:
@@ -768,7 +769,7 @@ sey100_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_100_q
 sey090_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
 sey110_db = open_database("/Users/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
 
-lim_sey = 999999999
+lim_sey = 999
 
 scale_sey_100 = (1/20)/(10/40)
 scale_sey_110 = (1/20)
