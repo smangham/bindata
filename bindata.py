@@ -441,6 +441,16 @@ class TransferFunction:
         ax_resp.invert_xaxis()
         fig.subplots_adjust(hspace=0, wspace=0)
 
+
+        if response_map:
+            ratio = np.sum(self._response_map)/np.sum(self._flux)
+            ratio_exp = np.floor(np.log10(ratio))
+            ratio_text_exp = r"{}{:.0f}{}".format("{",ratio_exp,"}")
+            ratio_text = '\n'
+            ratio_text += r"${:.2f}\times 10^{}$".format(ratio/(10**ratio_exp), ratio_text_exp)
+            ax_tf.text(0.05, 0.95, r"$\frac{\Delta L}{L}/\frac{\Delta C}{C}=$"+ratio_text,
+                transform=ax_tf.transAxes, fontsize=18, verticalalignment='top', horizontalalignment='left')
+
         # Set the properties that depend on log and wave/velocity status
         cb_label = None
         cb_label_vars = r""
@@ -567,14 +577,6 @@ class TransferFunction:
         ax_tf.set_xlim(left=bins_x[0], right=bins_x[-1])
         ax_tf.set_aspect('auto')
 
-        if response_map:
-            ratio = np.sum(self._response_map)/np.sum(self._flux)
-            ratio_exp = np.floor(np.log10(ratio))
-            ratio_text_exp = r"{}{:.0f}{}".format("{",ratio_exp,"}")
-            ratio_text = '\n'
-            ratio_text += r"${:.2f}\times 10^{}$".format(ratio/(10**ratio_exp), ratio_text_exp)
-            ax_tf.text(0.05, 0.95, r"$\frac{\Delta L}{L}/\frac{\Delta C}{C}=$"+ratio_text,
-                transform=ax_tf.transAxes, fontsize=10, verticalalignment='top', horizontalalignment='left')
 
         # Add lines for keplerian rotational outflows
         if keplerian is not None:
