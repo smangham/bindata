@@ -749,9 +749,6 @@ def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, file=None):
     total_max = np.sum(tf_max._flux).item()
 
     calibration_factor = total_mid / ((total_min + total_max) / 2)
-    # print('FROM:',total_min, total_mid, total_max)
-    # print('CALIBRATION IS:',calibration_factor)
-    # print('RESULTS ARE:',total_min*calibration_factor, total_mid, total_max*calibration_factor)
 
     tf_mid.response_map_by_tf(tf_min, tf_max,cf_min=1, cf_max=1).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"resp_mid")
     rf_mid = tf_mid.modal_delay(response=True)
@@ -787,24 +784,18 @@ wave_c4 = 1548.18
 # RUN FOR C4
 # ------------------------------------------------------------------------------
 
-sey100_tf_c4 = TransferFunction(sey100_db, "sey100_c4", luminosity=1.043e44, dimensions=dims)
-sey100_tf_c4.line(416, wave_c4).spectrum(0).run(scaling_factor=scale_sey_100, delay_dynamic_range=1.25, limit=lim_sey)
-sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
-sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
+# sey100_tf_c4 = TransferFunction(sey100_db, "sey100_c4", luminosity=1.043e44, dimensions=dims)
+# sey100_tf_c4.line(416, wave_c4).spectrum(0).run(scaling_factor=scale_sey_100, delay_dynamic_range=1.25, limit=lim_sey)
+# sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
+# sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
-do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey)
-do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey)
-
-# ------------------------------------------------------------------------------
-# RUN FOR Ha
-# ------------------------------------------------------------------------------
-sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
-sey100_tf_ha.line(28, wave_ha).spectrum(0).run(scaling_factor=scale_sey_100, limit=lim_sey)
-sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
-sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
-
-do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey)
-do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey)
+# # ------------------------------------------------------------------------------
+# # RUN FOR Ha
+# # ------------------------------------------------------------------------------
+# sey100_tf_ha = TransferFunction(sey100_db, "sey100_ha", luminosity=1.043e44,  template=sey100_tf_c4, template_different_line=True)
+# sey100_tf_ha.line(28, wave_ha).spectrum(0).run(scaling_factor=scale_sey_100, limit=lim_sey)
+# sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_090, limit=lim_sey)
+# sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 # ==============================================================================
 # RUN FOR LONG TIMESCALES
@@ -817,7 +808,7 @@ sey090_tf_c4 = TransferFunction(sey090_db, "sey090_c4", luminosity=0.9391e44, te
 sey110_tf_c4 = TransferFunction(sey110_db, "sey110_c4", luminosity=1.148e44,  template=sey100_tf_c4, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 do_tf_plots([sey090_tf_c4, sey100_tf_c4, sey110_tf_c4], keplerian=kep_sey, dynamic_range=2, name="long", file='sey_c4')
-sey_c4_delay = do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey, name="long", file='sey_c4')
+do_rf_plots(sey090_tf_c4, sey100_tf_c4, sey110_tf_c4, keplerian=kep_sey, name="long", file='sey_c4')
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
@@ -828,8 +819,8 @@ sey090_tf_ha = TransferFunction(sey090_db, "sey090_ha", luminosity=0.9391e44, te
 sey110_tf_ha = TransferFunction(sey110_db, "sey110_ha", luminosity=1.148e44,  template=sey100_tf_ha, template_different_spectrum=True).spectrum(0).run(scaling_factor=scale_sey_110, limit=lim_sey)
 
 do_tf_plots([sey090_tf_ha, sey100_tf_ha, sey110_tf_ha], keplerian=kep_sey, dynamic_range=2, name="long", file='sey_ha')
-sey_ha_delay = do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey, name="long", file='sey_ha')
-sys.exit(1)
+do_rf_plots(sey090_tf_ha, sey100_tf_ha, sey110_tf_ha, keplerian=kep_sey, name="long", file='sey_ha')
+#sys.exit(1)
 
 # ==============================================================================
 # RUN FOR QSO
@@ -849,24 +840,24 @@ scale_qso_090 = 1/20
 # ==============================================================================
 # RUN FOR C4
 # ------------------------------------------------------------------------------
-qso100_tf_c4 = TransferFunction(qso100_db, "qso100_c4", luminosity=1.043e46, dimensions=dims)
-qso100_tf_c4.line(445, wave_c4).spectrum(2).run(scaling_factor=scale_qso_100, delay_dynamic_range=1, limit=lim_qso)
-qso110_tf_c4 = TransferFunction(qso110_db, "qso110_c4", luminosity=1.148e46,  template=qso100_tf_c4).run(scaling_factor=scale_qso_110, limit=lim_qso)
-qso090_tf_c4 = TransferFunction(qso090_db, "qso090_c4", luminosity=0.9391e46, template=qso100_tf_c4).run(scaling_factor=scale_qso_090, limit=lim_qso)
+# qso100_tf_c4 = TransferFunction(qso100_db, "qso100_c4", luminosity=1.043e46, dimensions=dims)
+# qso100_tf_c4.line(445, wave_c4).spectrum(2).run(scaling_factor=scale_qso_100, delay_dynamic_range=1, limit=lim_qso)
+# qso110_tf_c4 = TransferFunction(qso110_db, "qso110_c4", luminosity=1.148e46,  template=qso100_tf_c4).run(scaling_factor=scale_qso_110, limit=lim_qso)
+# qso090_tf_c4 = TransferFunction(qso090_db, "qso090_c4", luminosity=0.9391e46, template=qso100_tf_c4).run(scaling_factor=scale_qso_090, limit=lim_qso)
 
-do_tf_plots([qso090_tf_c4, qso100_tf_c4, qso110_tf_c4], keplerian=kep_qso, dynamic_range=2)
-do_rf_plots(qso090_tf_c4, qso100_tf_c4, qso110_tf_c4, keplerian=kep_qso)
+# do_tf_plots([qso090_tf_c4, qso100_tf_c4, qso110_tf_c4], keplerian=kep_qso, dynamic_range=2)
+# do_rf_plots(qso090_tf_c4, qso100_tf_c4, qso110_tf_c4, keplerian=kep_qso)
 
-# ------------------------------------------------------------------------------
-# RUN FOR Ha
-# ------------------------------------------------------------------------------
-qso100_tf_ha = TransferFunction(qso100_db, "qso100_ha", luminosity=1.043e46,  template=qso100_tf_c4, template_different_line=True)
-qso100_tf_ha.line(44, wave_ha).run(scaling_factor=scale_qso_100, limit=lim_qso)
-qso090_tf_ha = TransferFunction(qso090_db, "qso090_ha", luminosity=0.9391e46, template=qso100_tf_ha).run(scaling_factor=scale_qso_090, limit=lim_qso)
-qso110_tf_ha = TransferFunction(qso110_db, "qso110_ha", luminosity=1.148e46,  template=qso100_tf_ha).run(scaling_factor=scale_qso_110, limit=lim_qso)#, limit=lim_qso)
+# # ------------------------------------------------------------------------------
+# # RUN FOR Ha
+# # ------------------------------------------------------------------------------
+# qso100_tf_ha = TransferFunction(qso100_db, "qso100_ha", luminosity=1.043e46,  template=qso100_tf_c4, template_different_line=True)
+# qso100_tf_ha.line(44, wave_ha).run(scaling_factor=scale_qso_100, limit=lim_qso)
+# qso090_tf_ha = TransferFunction(qso090_db, "qso090_ha", luminosity=0.9391e46, template=qso100_tf_ha).run(scaling_factor=scale_qso_090, limit=lim_qso)
+# qso110_tf_ha = TransferFunction(qso110_db, "qso110_ha", luminosity=1.148e46,  template=qso100_tf_ha).run(scaling_factor=scale_qso_110, limit=lim_qso)#, limit=lim_qso)
 
-do_tf_plots([qso090_tf_ha, qso100_tf_ha, qso110_tf_ha], keplerian=kep_qso, dynamic_range=2)
-do_rf_plots(qso090_tf_ha, qso100_tf_ha, qso110_tf_ha, keplerian=kep_qso)
+# do_tf_plots([qso090_tf_ha, qso100_tf_ha, qso110_tf_ha], keplerian=kep_qso, dynamic_range=2)
+# do_rf_plots(qso090_tf_ha, qso100_tf_ha, qso110_tf_ha, keplerian=kep_qso)
 
 # ==============================================================================
 # RUN FOR LONG TIMESCALES
@@ -879,8 +870,7 @@ qso090_tf_c4 = TransferFunction(qso090_db, "qso090_c4", luminosity=0.9391e46, te
 qso110_tf_c4 = TransferFunction(qso110_db, "qso110_c4", luminosity=1.148e46,  template=qso100_tf_c4).run(scaling_factor=scale_qso_110, limit=lim_qso)#, limit=lim_qso)
 
 do_tf_plots([qso090_tf_c4, qso100_tf_c4, qso110_tf_c4], keplerian=kep_qso, dynamic_range=3, name="long", file='qso_c4')
-qso_c4_delay = do_rf_plots(qso090_tf_c4, qso100_tf_c4, qso110_tf_c4, keplerian=kep_qso, name="long", file='qso_c4')
-np.savetxt("qso_c4_delay.txt", qso_c4_delay, header="Delay Delay_Lower Delay_Upper")
+do_rf_plots(qso090_tf_c4, qso100_tf_c4, qso110_tf_c4, keplerian=kep_qso, name="long", file='qso_c4')
 
 # ------------------------------------------------------------------------------
 # RUN FOR Ha
