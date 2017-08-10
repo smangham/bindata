@@ -205,6 +205,13 @@ class TransferFunction:
         self._wave_range = [wave_min, wave_max]
         self._query = self._query.filter(Photon.Wavelength >= wave_min, Photon.Wavelength <= wave_max)
         return self
+    def wavelengths(self, wave_range):
+        assert len(wave_range) < 3,\
+            "When providing an array, it must be of more than 2 entries! Use wavelength(min, max)."
+        self._bins_wave = wave_range
+        self._wavelengths(wave_range[0], wave_range[-1])
+        return self
+
     def lines(self, line_list):
         assert len(lines) > 1,\
             "For a single line, use the 'line()' filter rather than 'lines()'!"
@@ -1128,7 +1135,6 @@ plt.savefig("cylindrical.eps", bbox_inches='tight')
 d090, xedges, yedges = np.histogram2d(p090[:,1], p090[:,0], bins=50, weights=p090[:,3])
 d110, xedges, yedges = np.histogram2d(p110[:,1], p110[:,0], bins=50, weights=p110[:,3])
 dDiff = (d110 - d090) / (50*(1.096e44 - 0.9912e44))
-ax = plt.subplot(111, projection='polar')
 clims = np.amax(np.abs(dDiff))
 pc = ax.pcolormesh(xedges, yedges, dDiff, cmap='RdBu_r', vmin=(-clims), vmax=clims)
 ax.set_rmax(3e15)
