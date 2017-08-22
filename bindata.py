@@ -807,9 +807,9 @@ def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, file=None):
 # # ==============================================================================
 # # RUN FOR SEYFERT
 # # ==============================================================================
-sey100_db = open_database("/home/swm1n12/python_runs/paper1_5548_resp/sey_100", "root", "password")
-sey090_db = open_database("/home/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
-sey110_db = open_database("/home/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
+# sey100_db = open_database("/home/swm1n12/python_runs/paper1_5548_resp/sey_100", "root", "password")
+# sey090_db = open_database("/home/swm1n12/python_runs/paper1_5548_resp/sey_090", "root", "password")
+# sey110_db = open_database("/home/swm1n12/python_runs/paper1_5548_resp/sey_110", "root", "password")
 
 lim_sey = 9999999
 
