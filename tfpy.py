@@ -28,7 +28,7 @@ seconds_per_day = 60*60*24
 def calculate_FWHM(X,Y):
     """
     Calculate FWHM from arrays
-    
+
     Taken from http://stackoverflow.com/questions/10582795/finding-the-full-width-half-maximum-of-a-peak
     I don't think this can cope with being passed a doublet or an array with no
     peak within it. Doublets will calculate FWHM from the HM of both!
@@ -45,12 +45,12 @@ def calculate_FWHM(X,Y):
     # Find the points where the difference is positive
     indexes = np.where(d>0)[0]
     # The first and last positive points are the edges of the peak
-    return abs(X[indexes[-1]] - X[indexes[0]]) 
+    return abs(X[indexes[-1]] - X[indexes[0]])
 
 def calculate_centroid(bins, vals, bounds=None):
     """
     Returns the centroid position, with optional percentile bounds.
-    
+
     Args:
         bins (numpy array): Array of bin bounds
         vals (numpy array): Array of bin values
@@ -89,13 +89,13 @@ def calculate_centroid(bins, vals, bounds=None):
                 bound_min = bins[len(bins)-1-index]
                 break
         # On reflection, they could both sum since I'm just iterating backwards.
-        # Also, I could use zip() even though they're numpy arrays as zip works fine 
+        # Also, I could use zip() even though they're numpy arrays as zip works fine
         # if you don't want to modify the array entries.
         # Maybe go over this later, should be easy enough to test.
 
-        # Return the centroid and the bins. 
+        # Return the centroid and the bins.
         # NOTE: If the value exceeds the bound range midway through a cell, it'll just return the min/max
-        # for that cell as appropriate. This will overestimate the error on the centroid. 
+        # for that cell as appropriate. This will overestimate the error on the centroid.
         return centroid_position, bound_min, bound_max
     else:
         return centroid_position
@@ -117,7 +117,7 @@ def calculate_midpoints(X):
 
 # ==============================================================================
 # PHYSICS FUNCTIONS
-# ==============================================================================       
+# ==============================================================================
 def calculate_delay(angle, phase, radius, days=True):
     """
     Delay relative to continuum for emission from a point on the disk.
@@ -135,7 +135,7 @@ def calculate_delay(angle, phase, radius, days=True):
         phase (float):  Rotational angle of point on disk, in radians. 0 = in line to observer
         radius (float): Radius of the point on the disk, in m
         days (bool):    Whether the timescale should be seconds or days
-    
+
     Returns:
         float:          Delay relative to continuum
     """
@@ -189,12 +189,12 @@ def doppler_shift_vel(line, wave):
     else:
         return apc.c.value * ((line / wave) - 1)
 
-# ==============================================================================       
+# ==============================================================================
 # TRANSFER FUNCTION DEFINITION
-# ==============================================================================       
-class TransferFunction:    
+# ==============================================================================
+class TransferFunction:
     """Used to create, store and query emissivity and response functions"""
-    def __init__(self, database, filename, continuum, wave_bins=None, delay_bins=None, template=None, 
+    def __init__(self, database, filename, continuum, wave_bins=None, delay_bins=None, template=None,
                     template_different_line=False, template_different_spectrum=False):
         """
         Initialises the TF, optionally by templating off another TF.
@@ -202,7 +202,7 @@ class TransferFunction:
         Sets up all the basic properties of the TF that are required to create
         it. It must be '.run()' to query the DB before it can itself be queried.
         If templating, it applies all the same filters that were applied to the
-        template TF, unless explicitly told not to. Filters don't overwrite! 
+        template TF, unless explicitly told not to. Filters don't overwrite!
         They stack. So you can't simply call '.line()' to change the line the TF
         corresponds to if its template was a different line, unless you specify
         thhat the template was of a different line.
@@ -215,7 +215,7 @@ class TransferFunction:
             wave_bins (int):    Number of wavelength/velocity bins
             delay_bins (int):   Number of delay time bins
             template (TransferFunction):
-                                Other TF to copy all filter settings from. Will 
+                                Other TF to copy all filter settings from. Will
                                 match delay, wave and velocity bins exactly
             template_different_line (bool):
                                 Is this TF going to share delay & velocity bins
@@ -226,7 +226,7 @@ class TransferFunction:
 
         Returns:
             TransferFunction:   The created TF
-    
+
         """
         assert (delay_bins is not None and wave_bins is not None) or template is not None,\
             "Must provide either resolutions or another TF to copy them from!"
@@ -325,7 +325,7 @@ class TransferFunction:
         assert self._line_wave is not None,\
             "Cannot limit doppler shift around a line without specifying a line!"
         self._velocity = velocity
-        self._query = self._query.filter(Photon.Wavelength >= doppler_shift_wave(self._line_wave, -velocity), 
+        self._query = self._query.filter(Photon.Wavelength >= doppler_shift_wave(self._line_wave, -velocity),
                                          Photon.Wavelength <= doppler_shift_wave(self._line_wave,  velocity))
         return self
     def wavelengths(self, wave_min, wave_max):
@@ -386,7 +386,7 @@ class TransferFunction:
             assert scat_min < scat_max,\
                 "Minimum continuum scatters must be below maximum scatters!"
         assert scat_min >= 0,\
-            "Must select a positive number of continuum scatters" 
+            "Must select a positive number of continuum scatters"
 
         if scat_max is not None:
             self._query = self._query.filter(Photon.ContinuumScatters >= scat_min, Photon.ContinuumScatters <= scat_max)
@@ -398,7 +398,7 @@ class TransferFunction:
             assert scat_min < scat_max,\
                 "Minimum resonant scatters must be below maximum scatters!"
         assert scat_min >= 0,\
-            "Must select a positive number of resonant scatters"    
+            "Must select a positive number of resonant scatters"
 
         if scat_max is not None:
             self._query = self._query.filter(Photon.ResonantScatters >= scat_min, Photon.ResonantScatters <= scat_max)
@@ -441,19 +441,30 @@ class TransferFunction:
 
     def FWHM(self, response=False, velocity=True):
         """Calculates the full width half maximum of the TF"""
-           
+
         if velocity:
             midpoints = calculate_midpoints(self._bins_vel)
         else:
             midpoints = calculate_midpoints(self._bins_wave)
 
         if response:
-            return calculate_FWHM(midpoints, np.sum(self._response, 0)) 
+            return calculate_FWHM(midpoints, np.sum(self._response, 0))
         else:
-            return calculate_FWHM(midpoints, np.sum(self._emissivity, 0)) 
+            return calculate_FWHM(midpoints, np.sum(self._emissivity, 0))
 
     def delay(self, response=False, threshold=0, bounds=None):
-        """Calculates the delay for the current data"""
+        """
+        Calculates the centroid delay for the current data
+
+        Args:
+            response (Bool):    Whether or not to calculate the delay from the response
+            threshold (Float):  Exclude all bins with value < threshold
+            bounds (Float):     Return the percentile bounds (i.e. bounds=0.25,
+                                the function will return [0.5, 0.25, 0.75])
+        Returns:
+            Float:              Centroid delay
+            Float[]:            Centroid and lower and upper bounds
+        """
         assert threshold < 1 or threshold >= 0,\
             "Threshold is a multiplier to the peak flux! It must be between 0 and 1"
 
@@ -464,14 +475,14 @@ class TransferFunction:
             data = np.sum(self._emissivity ,1)
         value_threshold = np.amax(data) * threshold
         delay_midp = calculate_midpoints(self._bins_delay)
-        
+
         delay_weighted = 0
         value_total = 0
         for value, delay in zip(data, delay_midp):
             if value >= value_threshold:
                 delay_weighted += value * delay
                 value_total    += value
-                
+
         return delay_weighted/value_total
 
     def run(self, scaling_factor=1.0, limit=None, verbose=False):
@@ -546,7 +557,7 @@ class TransferFunction:
             # If we have no velocity bins, this is a factory-fresh TF
             if self._bins_vel is None:
                 # Data returned as Wavelength, Delay, Weight. Find min and max delays and wavelengths
-                range_wave = [np.amin(data[:,0]), np.amax(data[:,0])] 
+                range_wave = [np.amin(data[:,0]), np.amax(data[:,0])]
             # If we do have velocity bins, this was templated off a different line and we need to copy the velocities (but bins are in km! not m!)
             else:
                 range_wave = [doppler_shift_wave(self._line_wave, self._bins_vel[0]*1000), doppler_shift_wave(self._line_wave, self._bins_vel[-1]*1000)]
@@ -554,21 +565,21 @@ class TransferFunction:
 
             # Now create the bins for each dimension
             self._bins_wave  = np.linspace(range_wave[0], range_wave[1],
-                                           self._bins_wave_count+1, endpoint=True, dtype=np.float64)                     
+                                           self._bins_wave_count+1, endpoint=True, dtype=np.float64)
 
         # Check if we've already got velocity bins from another TF and we have a line to center around
         if self._bins_vel is None and self._line_wave is not None:
             range_wave = [self._bins_wave[0], self._bins_wave[1]]
-            self._bins_vel  = np.linspace(doppler_shift_vel(self._line_wave, range_wave[1]), 
+            self._bins_vel  = np.linspace(doppler_shift_vel(self._line_wave, range_wave[1]),
                                           doppler_shift_vel(self._line_wave, range_wave[0]),
                                           self._bins_wave_count+1, endpoint=True, dtype=np.float64)
             # Convert speed from m/s to km/s
             self._bins_vel = np.true_divide(self._bins_vel, 1000.0)
 
         # Now we bin the photons, weighting them by their photon weights for the luminosity
-        self._emissivity, junk, junk = np.histogram2d(data[:,1], data[:,0], weights=data[:,2], 
-                                                    bins=[self._bins_delay, self._bins_wave]) 
-        # Keep an unweighted photon count for statistical error purposes                  
+        self._emissivity, junk, junk = np.histogram2d(data[:,1], data[:,0], weights=data[:,2],
+                                                    bins=[self._bins_delay, self._bins_wave])
+        # Keep an unweighted photon count for statistical error purposes
         self._count, junk, junk = np.histogram2d(data[:,1], data[:,0],
                                                     bins=[self._bins_delay, self._bins_wave])
 
@@ -601,14 +612,14 @@ class TransferFunction:
             "You must provide a delay, or a delay index!"
         assert delay_index is None or delay is None,\
             "You must provide either a delay or a delay index!"
-        
+
         if delay is not None:
             if delay < self._bins_delay[0] or delay > self._bins_delay[-1]:
                 if wave is None:
                     return np.zeros(self._bins_wave_count)
                 else:
                     return 0
-            delay_index = np.searchsorted(self._bins_delay, delay)  
+            delay_index = np.searchsorted(self._bins_delay, delay)
         elif delay_index is not None:
             if delay_index < 0 or delay_index > self._bins_delay_count:
                 return 0;
@@ -651,9 +662,9 @@ class TransferFunction:
                 return np.column_stack((calculate_midpoints(self._bins_delay/seconds_per_day), np.sum(self._emissivity, 1)))
             else:
                 return np.column_stack((calculate_midpoints(self._bins_delay), np.sum(self._emissivity, 1)))
-        
 
-    def plot(self, log=False, normalised=False, rescaled=False, velocity=False, name=None, days=True, 
+
+    def plot(self, log=False, normalised=False, rescaled=False, velocity=False, name=None, days=True,
             response_map=False, keplerian=None, dynamic_range=None, RMS=False):
         """Takes the data gathered by calling 'run' and outputs a plot"""
         assert response_map is False or self._response is not None,\
@@ -665,7 +676,7 @@ class TransferFunction:
         assert self._bins_wave is not None,\
             "You must run the TF query with '.run()' before plotting it!"
 
-        #matplotlib.rcParams["text.usetex"] = "True" 
+        #matplotlib.rcParams["text.usetex"] = "True"
         matplotlib.rcParams.update({'font.size': 14})
 
         start = time.clock()
@@ -698,7 +709,7 @@ class TransferFunction:
             ratio = np.sum(self._response)/np.sum(self._emissivity)
             ratio_exp = np.floor(np.log10(ratio))
             ratio_text = '\n'
-            
+
             if ratio_exp < -1 or ratio_exp > 1:
                 ratio_text_exp = r"{}{:.0f}{}".format("{",ratio_exp,"}")
                 ratio_text += r"${:.2f}\times 10^{}$".format(ratio/(10**ratio_exp), ratio_text_exp)
@@ -726,7 +737,7 @@ class TransferFunction:
             print("Total line: {:.3e}".format(np.sum(data_plot)))
             psi_label = r"$\Psi_{T}$"
         cb_label = psi_label
-    
+
         # Set the xlabel and colour bar label - these differ if velocity or not
         x_bin_mult = 1
         bins_x = np.zeros(shape=self._bins_wave_count)
@@ -767,7 +778,7 @@ class TransferFunction:
 
         # Rescale the values to be luminosity/km s^-1 d or /A d
         for bin_y in range(0, self._bins_delay_count):
-            width_y = bins_y[bin_y+1] - bins_y[bin_y]    
+            width_y = bins_y[bin_y+1] - bins_y[bin_y]
             for bin_x in range(0, self._bins_wave_count):
                 width_x = bins_x[bin_x+1] - bins_x[bin_x]
                 data_plot[bin_y][bin_x] /= (width_x * x_bin_mult * width_y)
@@ -790,8 +801,8 @@ class TransferFunction:
         if response_map and RMS:
             ax_spec.axhline(0, color='grey')
             ax_resp.axvline(0, color='grey')
- 
-            data_plot_rms = np.sqrt(np.sum(np.square(data_plot), 0) / self._bins_wave_count)           
+
+            data_plot_rms = np.sqrt(np.sum(np.square(data_plot), 0) / self._bins_wave_count)
             exponent_rms = np.floor(np.log10(np.amax(data_plot_rms)))
             exponent_rms_text = "{}{:.0f}{}".format("{",exponent_rms,"}")
             maximum_spec = np.amax(data_plot_spec)/np.power(10, exponent_spec)
@@ -803,7 +814,7 @@ class TransferFunction:
             spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='m', label=r'{}(v)/{:.2f}$x10^{}$'.format(psi_label, maximum_spec, exponent_spec_text))
             lg_orig = ax_spec.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
             ax_spec.set_ylabel(r'{}(v)'.format(psi_label)+"\n"+r'km s$^{-1}$')
-        
+
         elif response_map:
             ax_spec.axhline(0, color='grey')
             ax_resp.axvline(0, color='grey')
@@ -828,7 +839,7 @@ class TransferFunction:
             cb_max = np.amax(data_plot)
             cb_min = np.amin(data_plot)
             dummy = "{}{:.0f}{}".format("{",maxval,"}")
-            cb_label_scale = r" 10$^{}$".format(dummy)        
+            cb_label_scale = r" 10$^{}$".format(dummy)
 
         # If this is a response map, it may have a negative component and need a different plot
         if response_map:
@@ -839,7 +850,7 @@ class TransferFunction:
 
         # Normalise or rescale the data. If doing neither, put units on cb.
         if normalised:
-            data_plot /= np.sum(data_plot)     
+            data_plot /= np.sum(data_plot)
             cb_label_units = r""
             cb_label_scale = r""
         elif rescaled:
@@ -864,12 +875,12 @@ class TransferFunction:
             ar_delay    = np.zeros(resolution) # * u.s
             ar_phase    = np.linspace(0, np.pi*2, resolution)
             ar_rad      = np.linspace(keplerian["radius"][0]*r_rad_grav, keplerian["radius"][1]*r_rad_grav,resolution)
-            ar_vel      = np.zeros(resolution) 
+            ar_vel      = np.zeros(resolution)
             r_rad_min   = r_rad_grav * keplerian["radius"][0]
             r_vel_max   = keplerian_velocity( r_mass_bh, r_rad_min)
-    
-           
-    
+
+
+
             # ITERATE OVER INNER EDGE
             for r_phase, r_wave, r_delay, r_vel in np.nditer([ar_phase, ar_wave, ar_delay, ar_vel], op_flags=['readwrite']):
                 r_vel[...]      = r_vel_max *  np.sin(r_phase) * np.sin(r_angle) / (1e3 * x_bin_mult)
@@ -908,9 +919,9 @@ class TransferFunction:
 def open_database(file_root, user=None, password=None, batch_size=25000):
     """
     Open or create a SQL database
-    
+
     Will open a SQL DB if one already exists, otherwise will create one from
-    file. Note, though, that if the process is interrupted the code cannot 
+    file. Note, though, that if the process is interrupted the code cannot
     intelligently resume- you must delete the half-written DB!
 
     Args:
@@ -953,7 +964,7 @@ def open_database(file_root, user=None, password=None, batch_size=25000):
         delay_dump = open("{}.delay_dump".format(file_root), 'r')
         for line in delay_dump:
             # For each line in this file, if it is not a comment
-            if line.startswith('#'): 
+            if line.startswith('#'):
                 continue
             try:
                 # Try reading it in as a series of values.
@@ -983,7 +994,7 @@ def open_database(file_root, user=None, password=None, batch_size=25000):
         print("Successfully read in ({:.1f}s)".format(time.clock()-start))
 
     return db_engine
-# ==============================================================================       
+# ==============================================================================
 
 s_user = "root"
 s_password = "password"
@@ -1023,7 +1034,7 @@ kep_qso = {"angle":40, "mass":1e9, "radius":[50,20000]}
 
 def do_tf_plots(tf_list_inp, dynamic_range=None, keplerian=None, name=None, file=None):
     tf_delay = []
-    for tf_inp in tf_list_inp:  
+    for tf_inp in tf_list_inp:
         tf_inp.plot(velocity=True, keplerian=keplerian, log=False, name=name)
         tf_inp.plot(velocity=True, keplerian=keplerian, log=True,  name=('log' if name is None else name+"_log"), dynamic_range=dynamic_range)
         tf_delay.append(tf_inp.delay(threshold=0.8))
@@ -1038,7 +1049,7 @@ def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, file=None):
         name += '_'
     else:
         name = ''
-    
+
     total_min  = np.sum(tf_min._emissivity).item()
     total_mid  = np.sum(tf_mid._emissivity).item()
     total_max = np.sum(tf_max._emissivity).item()
@@ -1047,7 +1058,7 @@ def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, file=None):
 
     tf_mid.response_map_by_tf(tf_min, tf_max,cf_min=1, cf_max=1).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"resp_mid")
     rf_mid = tf_mid.delay(response=True, threshold=0.8)
-    
+
     tf_mid.response_map_by_tf(tf_min, tf_mid,cf_min=calibration_factor, cf_max=1).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"resp_low")
     rf_min = tf_mid.delay(response=True, threshold=0.8)
     tf_mid.response_map_by_tf(tf_mid, tf_max,cf_min=1, cf_max=calibration_factor).plot(velocity=True, response_map=True, keplerian=keplerian, name=name+"resp_high")
@@ -1055,5 +1066,4 @@ def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, file=None):
 
     if file is not None:
         print("Saving RF plots to file: {}".format(file+"_rf_delay.txt"))
-        np.savetxt(file+"_rf_delay.txt", np.array([rf_min, rf_mid, rf_max],dtype='float'), header="Delay") 
-
+        np.savetxt(file+"_rf_delay.txt", np.array([rf_min, rf_mid, rf_max],dtype='float'), header="Delay")
