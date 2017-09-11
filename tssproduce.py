@@ -132,7 +132,7 @@ def import_lightcurve(lightcurve_file, time_units=None, value_units=None,
 
 def import_spectrum(spectrum_file, bins, values, frequency=True, limits=None,
                     wave_units=None, value_units=None, error_ratio=None, errors=None,
-                    subtract_continuum_with_mask=None):
+                    subtract_continuum_with_mask=None, rebin_to=None):
     """
     Imports a spectrum, and converts to target units
 
@@ -272,6 +272,37 @@ def import_spectrum(spectrum_file, bins, values, frequency=True, limits=None,
             if spectrum['error'][i] < 0:
                 spectrum['error'][i] = np.abs(spectrum['error'][i])
 
+    if rebin_to:
+        wave_bounds = np.linspace(spectrum['wave'][0], spectrum['wave'][-1], rebin_to+1)
+        wave_midpoints = np.zeros(rebin_to)
+        values = np.zeros(rebin_to)
+        errors = np.zeros(rebin_to)
+
+        for i in range(0, rebin_to):
+            wave_midpoints[i] = (wave_bounds[i] + wave_bounds[i+1]) / 2
+            full_bin_width = wave_bounds[i+1] - wave_bounds[i]
+            for j in range(0, len(spectrum)):
+                if spectrum["wave_min"][j] > wave_bounds[i+1] or spectrum["wave_max"][j] < wave_bounds[i]:
+                    continue
+                elif spectrum["wave_min"][j] > wave_bounds[i] and spectrum["wave_max"][j] < wave_bounds[i+1]:
+                    bin_width = spectrum["wave_max"][j] - spectrum["wave_min"][j]
+                elif spectrum["wave_min"][j] < wave_bounds[i]:
+                    bin_width = spectrum["wave_max"][j] - wave_bounds[i]
+                elif spectrum["wave_max"][j] > wave_bounds[i+1]:
+                    bin_width = wave_bounds[i+1] - spectrum["wave_min"][j]
+                   
+                values[i] += spectrum["value"][j] * bin_width / full_bin_width
+                errors[i] += spectrum["error"][j] * bin_width / full_bin_width
+            
+            if value[i] < 0:
+                value[i] = 0
+
+        fig, ax = plt.subplots(1)
+        ax.plot(spectrum["wave"], spectrum["value"], '-', c='r')
+        ax.plot(wave_midpoints, values, '-x', c='b')
+        fig.show()
+        sys.exit(1) 
+
     return spectrum
 
 def output_CARAMEL(lightcurve, spectra, spectra_times, spectrum, suffix):
@@ -398,6 +429,7 @@ spectrum_wave_units = u.angstrom
 spectrum_flux_error_ratio = 50
 spectrum_wave_range = [4861 - 250, 4861 + 250] * u.angstrom
 spectrum_continuum_subtract_range = [4861 - 175, 4861 + 175] * u.angstrom
+spectrum_rebin_to = 50
 # ------ SPECTRA TIMES ---------
 spectra_file = "spectra_qso.dat"
 spectra_times_file = "spectra_times.dat"
@@ -432,13 +464,6 @@ lim_test = 99999999999
 print("=== tssproduce started! ===")
 
 # Import all data files
-print("Importing lightcurve file '{}'...".format(lightcurve_file))
-lightcurve = import_lightcurve(lightcurve_file,
-                            time_units=lightcurve_time_units,
-                            value_units=lightcurve_value_units,
-                            target_bolometric_luminosity=lightcurve_target_lum,
-                            delta_continuum_range=0.1)
-
 print("Importing spectrum file '{}'...".format(spectrum_file))
 spectrum = import_spectrum(spectrum_file, spectrum_bins_name, spectrum_value_name,
                             frequency=False,
@@ -446,7 +471,15 @@ spectrum = import_spectrum(spectrum_file, spectrum_bins_name, spectrum_value_nam
                             value_units=spectrum_value_units,
                             error_ratio=spectrum_flux_error_ratio,
                             limits=spectrum_wave_range,
-                            subtract_continuum_with_mask=spectrum_continuum_subtract_range)
+                            subtract_continuum_with_mask=spectrum_continuum_subtract_range,
+                            rebin_to=spectrum_rebin_to)
+
+print("Importing lightcurve file '{}'...".format(lightcurve_file))
+lightcurve = import_lightcurve(lightcurve_file,
+                            time_units=lightcurve_time_units,
+                            value_units=lightcurve_value_units,
+                            target_bolometric_luminosity=lightcurve_target_lum,
+                            delta_continuum_range=0.1)
 
 print("Importing spectra timing file '{}'...".format(spectra_times_file))
 spectra_times = import_spectra_times(spectra_times_file,
