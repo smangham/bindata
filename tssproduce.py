@@ -145,13 +145,13 @@ def import_lightcurve(lightcurve_file, time_units=None, value_units=None,
 
     return lightcurve
 
+
 def import_spectrum(spectrum_file, bins, values, frequency=True, limits=None,
-                    wave_units=None, value_units=None, error_ratio=None, errors=None,
+                    wave_units=None, value_units=None,
+                    errors=None, ,error_absolute=None, error_relative=None,
                     subtract_continuum_with_mask=None, rebin_to=None):
     """
     Imports a spectrum, and converts to target units
-
-
 
     Returns:
         astropy.Table:  Table of input file. Key columns are 'wave', 'value' and 'error'
@@ -166,7 +166,7 @@ def import_spectrum(spectrum_file, bins, values, frequency=True, limits=None,
     # Rename value column and assign units
     spectrum.rename_column(values, 'value')
     spectrum['value'].unit = value_units
-    if errors:
+    if error:
         # If there are errors, set the value
         spectrum.rename_column(errors, 'error')
     else:
@@ -288,13 +288,6 @@ def import_spectrum(spectrum_file, bins, values, frequency=True, limits=None,
 
         #sys.exit(1)
 
-    if error_ratio:
-        # If we're creating errors based on a passed error ratio
-        spectrum['error'] = spectrum['value'] / error_ratio
-        for i in range(0,len(spectrum)):
-            if spectrum['error'][i] < 0:
-                spectrum['error'][i] = np.abs(spectrum['error'][i])
-
     if rebin_to:
         # If we're rebinning to X bins
         wave_bounds = np.linspace(spectrum['wave'][0], spectrum['wave'][-1], rebin_to+1)
@@ -378,6 +371,17 @@ def import_spectrum(spectrum_file, bins, values, frequency=True, limits=None,
         spectrum["freq"].unit = 1/u.s
         spectrum["freq_min"].unit = 1/u.s
         spectrum["freq_max"].unit = 1/u.s
+
+
+    if error_absolute:
+        # If we're adding an absolute error, apply
+        spectrum['error'] = error_absolute
+
+    if error_relative:
+        # If we're adding a relative error scaled to the peak
+        index = np.argmax(spectrum['value'])
+        spectrum['error'] = spectrum['value'][index] * error_relative
+
     return spectrum
 
 def output_CARAMEL(lightcurve, spectra, spectra_times, spectrum, suffix):
@@ -386,7 +390,7 @@ def output_CARAMEL(lightcurve, spectra, spectra_times, spectrum, suffix):
 
     Args:
         lightcurve (Table):     Continuum values and times, in seconds and real units
-        spectra (Table):        Table of wavelengths and spectra
+        spectra (Table):        Table of wavelengths and spectra. Continuum-subtracted.
         spectra_times (Table):  Table of spectrum times
         spectrum (Table):       Table of the start spectra (used for errors)
         suffix (String):        Suffix appended to filename
@@ -456,7 +460,7 @@ def output_MEMECHO(lightcurve, spectra, spectra_times, spectrum, suffix):
 
     Args:
         lightcurve (Table):     Continuum values and times, in seconds and real units
-        spectra (Table):        Table of wavelengths and spectra
+        spectra (Table):        Table of wavelengths and spectra. Not continuum-subtracted.
         spectra_times (Table):  Table of spectrum times
         spectrum (Table):       Table of the start spectra (used for errors)
         suffix (String):        Suffix appended to file name
@@ -472,35 +476,36 @@ def output_MEMECHO(lightcurve, spectra, spectra_times, spectrum, suffix):
 
     names = []
     for iter, column in enumerate(spectra.colnames[2:]):
-        np.savetxt('prepspec_{}_{}.txt'.format(suffix, iter), np.column_stack((spectra['wave'], spectra[column], spectrum['error'])))
-        names.append('prepspec_{}_{}.txt'.format(suffix, iter))
+        np.savetxt('prepspec_{}_{:03d}.txt'.format(suffix, iter), np.column_stack((spectra['wave'], spectra[column], spectrum['error'])))
+        names.append('prepspec_{}_{:03d}.txt'.format(suffix, iter))
 
     with open('prepspec_times_{}.txt'.format(suffix), 'w') as file:
         for name, time in zip(names, spectra_times['time']):
-            file.write("{} {}".format(name, time))
+            file.write("{} {}\n".format(name, time.value))
 
     with open('memecho_lightcurve_{}.txt'.format(suffix), 'w') as file:
         for time, value, error in zip(lightcurve['time'], lightcurve['value'], lightcurve['error']):
-            file.write("{} {} {}".format(time, value, error))
+            file.write("{} {} {}\n".format(time, value, error))
     return
 
 # ========== SETTINGS ==========
 # -------- TF SETTINGS ---------
-lim_test = 999999999
-delay_bins = 100
+tf_lim_test = 999999999
+tf_delay_bins = 100
 tf_wave = 6562.8
 # ---- Seyfert Settings ----
-# tf_continuum = 1.043e44
-# line = 31
-# scale_mid = 1/20
-# scale_min = 1/40
-# scale_max = 1/40
+# spectrum_file = "sey_100.spec"
+# line = 28
+# databases = { 'min':{'path':"/home/swm1n12/bindata/sey_090", 'scale':60, 'continuum': 1.043e44*0.9},
+#                   'mid':{'path':"/home/swm1n12/bindata/sey_100", 'scale':60, 'continuum': 1.043e44},
+#                   'max':{'path':"/home/swm1n12/bindata/sey_110", 'scale':60, 'continuum': 1.043e44*1.1}  }
+
 # ---- QSO Settings ----
-tf_continuum = 1.043e46
-line = 44
-scale_mid = 1/100
-scale_min = 1/50
-scale_max = 1/50
+spectrum_file = "qso_100.spec"
+tf_line = 44
+databases = { 'min':{'path':"/home/swm1n12/bindata/qso_090", 'scale':50,  'continuum': 1.043e46*0.9},
+              'mid':{'path':"/home/swm1n12/bindata/qso_100", 'scale':100, 'continuum': 1.043e46},
+              'max':{'path':"/home/swm1n12/bindata/qso_110", 'scale':50,  'continuum': 1.043e46*1.1}  }
 
 # ---- LIGHTCURVE SETTINGS -----
 lightcurve_file = "light_1158.dat"
@@ -511,7 +516,6 @@ lightcurve_value_units = 1e-15 * u.erg / (u.s * u.angstrom * u.cm * u.cm)
 lightcurve_target_lum =  tf_continuum * u.erg / (u.s * np.pi * np.power(u.parsec.to(u.cm)*100, 2) * u.cm * u.cm)
 
 # ----- SPECTRUM SETTINGS ------
-spectrum_file = "qso_100.spec"
 spectrum_bins_name = "Lambda"
 spectrum_value_name = "A40P0.50"
 # python spectra are per cm2 at 100 pc -> we need to divide ΔC by this value too
@@ -519,21 +523,34 @@ spectrum_value_units = u.angstrom * u.erg / (u.s * u.angstrom * (np.pi * np.powe
 #spectrum_value_to_lightcurve_value = (np.pi * np.power(u.parsec.to(u.cm) * 100, 2)) * u.cm * u.cm / 1000
 #spectrum_value_units = 1e-14 * u.erg / (u.s * u.angstrom * u.cm * u.cm)
 spectrum_wave_units = u.angstrom
-spectrum_flux_error_ratio = 50
-spectrum_wave_range = [tf_wave - 250, tf_wave + 250] * u.angstrom
-spectrum_continuum_subtract_range = [tf_wave - 190, tf_wave + 190] * u.angstrom
-spectrum_rebin_to = 50
 
-# ------ SPECTRA TIMES ---------
-spectra_file = "spectra_qso.dat"
+# ----- SPECTRUM (FULL) SETTINGS -----
+# Used to create the non-continuum-subtracted spectra for MEMECHO
+# As much continuum as possible! Can't go further due to the limits of Python.
+spectrum_full_wave_range = [tf_wave - 6200, tf_wave + 7000] * u.angstrom
+spectrum_full_rebin_to = 100
+spectrum_full_continuum_error = 0.01
+
+# ----- SPECTRUM (SUBTRACTED) SETTINGS -----
+# Used to create the continuum-subtracted spectra for CARAMEL
+# As little continuum as possible! We want just the line to make it faster.
+spectrum_line_wave_range = [tf_wave - 250, tf_wave + 250] * u.angstrom
+spectrum_line_subtract_range = [tf_wave - 190, tf_wave + 190] * u.angstrom
+spectrum_line_rebin_to = 50
+spectrum_line_error = 0.02
+
+# ------ SPECTRA TIMES ---------"
 spectra_times_file = "spectra_times.dat"
 spectra_times_units = ucds.MJD
 spectra_fudge_factor = 1
 
-# ---- VISUALIZATION SETTINGS ------
-trailed_spectrogram_file = "trailedspectrogram_qso"
-animation_file = "timeseries_qso.mp4"
+# ---- VISUALIZATION & OUTPUT SETTINGS ------
+trailed_spectrogram_file = "out_trailedspectrogram_qso"
+animation_file = "out_timeseries_qso.mp4"
 is_reversed = False
+debug_spectra_file = "out_spectra_qso"
+debug_lightcurve_file = "out_lightcurve"
+
 # --------- RESCALING ----------
 delay_max = 30 * u.d
 delta_continuum_range = 0.1
@@ -547,14 +564,21 @@ print("=== tssproduce started! ===")
 
 # Import all data files
 print("Importing spectrum file '{}'...".format(spectrum_file))
-spectrum = import_spectrum(spectrum_file, spectrum_bins_name, spectrum_value_name,
+spectrum_line = import_spectrum(spectrum_file, spectrum_bins_name, spectrum_value_name,
                             frequency=False,
                             wave_units=spectrum_wave_units,
                             value_units=spectrum_value_units,
-                            error_ratio=spectrum_flux_error_ratio,
-                            limits=spectrum_wave_range,
-                            subtract_continuum_with_mask=spectrum_continuum_subtract_range,
-                            rebin_to=spectrum_rebin_to)
+                            error_relative=spectrum_line_error,
+                            limits=spectrum_line_wave,
+                            subtract_continuum_with_mask=spectrum_line_subtract_range,
+                            rebin_to=spectrum_line_rebin_to)
+spectrum_full = import_spectrum(spectrum_file, spectrum_bins_name, spectrum_value_name,
+                            frequency=False,
+                            wave_units=spectrum_wave_units,
+                            value_units=spectrum_value_units,
+                            error_absolute=spectrum_line['error'][0],
+                            limits=spectrum_full_wave_range,
+                            rebin_to=spectrum_full_rebin_to)
 
 print("Importing lightcurve file '{}'...".format(lightcurve_file))
 lightcurve = import_lightcurve(lightcurve_file,
@@ -567,44 +591,46 @@ print("Importing spectra timing file '{}'...".format(spectra_times_file))
 spectra_times = import_spectra_times(spectra_times_file,
                             time_units=spectra_times_units)
 
-# Take spectrum and produce full list of wavelength bins for it to feed to the TF
-spectrum_bounds = list(spectrum["wave_min"])
-spectrum_bounds.append(spectrum["wave_max"][-1])
-spectrum_bounds = np.array(spectrum_bounds)
 
 # Produce a TF
 print("Generating Ψ...")
-db_100 = tfpy.open_database("/Users/amsys/paper_tss/qso_100", "root", "password")
-db_090 = tfpy.open_database("/Users/amsys/paper_tss/qso_090", "root", "password")
-db_110 = tfpy.open_database("/Users/amsys/paper_tss/qso_110", "root", "password")
-tf_mid = tfpy.TransferFunction(db_100, "qso100", continuum=tf_continuum,
-                                wave_bins=(len(spectrum_bounds)-1), delay_bins=delay_bins)
+def generate_tf(databases, spectrum, delay_bins, line, wave, limit=999999999):
+    db_mid = tfpy.open_database(databases['mid']['path'], "root", "password")
+    db_min = tfpy.open_database(databases['min']['path'], "root", "password")
+    db_max = tfpy.open_database(databases['max']['path'], "root", "password")
+    # Take spectrum and produce full list of wavelength bins for it to feed to the TF
+    bounds = np.array(list(spectrum["wave_min"]).append(spectrum["wave_max"][-1]))
 
-tf_mid.line(line, tf_wave).wavelength_bins(spectrum_bounds).delay_dynamic_range(2).run(
-            scaling_factor=scale_mid, limit=lim_test,verbose=True).plot()
-tf_min = tfpy.TransferFunction(db_090, "qso090", continuum=tf_continuum*0.9, template=tf_mid).run(
-            scaling_factor=scale_min, limit=lim_test).plot()
-tf_max = tfpy.TransferFunction(db_110, "qso110", continuum=tf_continuum*1.1, template=tf_mid).run(
-            scaling_factor=scale_max, limit=lim_test).plot()
+    tf_mid = tfpy.TransferFunction( db_mid, "qso100", continuum=databases['mid']['continuum'],
+                wave_bins=(len(bounds)-1), delay_bins=delay_bins)
+    tf_mid.line(line, wave).wavelength_bins(bounds).delay_dynamic_range(2).run(
+                scaling_factor=databases['mid']['scale'], limit=limit,verbose=True).plot()
+    tf_min = tfpy.TransferFunction(db_min, "qso090", continuum=databases['min']['continuum'], template=tf_mid).run(
+                scaling_factor=databases['min']['scale'], limit=lim_test).plot()
+    tf_max = tfpy.TransferFunction(db_max, "qso110", continuum=databases['max']['continuum'], template=tf_mid).run(
+                scaling_factor=databases['max']['scale'], limit=lim_test).plot()
+    tf_mid.response_map_by_tf(tf_min, tf_max).plot(response_map=True, name='resp')
+    return tf_mid
 
-
-tf_mid.response_map_by_tf(tf_min, tf_max).plot(response_map=True, name='resp')
-print("Total Ψ = {}".format(np.sum(tf_mid._response)))
-print("Total L = {}".format(np.sum(spectrum['value'])))
-
+# Repeat for full and subtracted spectra
+tf_full = generate_tf(databases, spectrum_full, tf_delay_bins, tf_line, tf_wave, tf_lim_test)
+tf_line = generate_tf(databases, spectrum_line, tf_delay_bins, tf_line, tf_wave, tf_lim_test)
 
 # ========
 # Convolve
 # ========
 
 # Set up the spectra array and set to baseline of start spectrum
-spectra = ap.table.Table([spectrum['wave'], spectrum['value']])
+spectra_full = ap.table.Table([spectrum_full['wave'], spectrum_full['value']])
+spectra_line = ap.table.Table([spectrum_line['wave'], spectrum_line['value']])
 # For each point in the lightcurve file
+
 for time in spectra_times['time']:
     # Add a base spectrum to the output spectra file
-    spectra["value {}".format(time)] = spectra['value']
-    spectra["value {}".format(time)].meta['time'] = time #* lightcurve['time'].unit
-    #spectra["value {}".format(time)] = 0.0
+    spectra_full["value {}".format(time)] = spectra['value']
+    spectra_full["value {}".format(time)].meta['time'] = time
+    spectra_line["value {}".format(time)] = spectra['value']
+    spectra_line["value {}".format(time)].meta['time'] = time
 
 # We need to evaluate at every bin-width's step
 delay_bins = (tf_mid.delay_bins() * u.s).to(lightcurve['time'].unit)
@@ -628,6 +654,15 @@ for step, time in enumerate(times):
 # -------------
 # Begin process
 # -------------
+def add_step_response(spectrum, spectra, stepname, delta_continuum, response):
+    for j in range(0, len(spectra)):
+        # Matching the format of spectra.c line:
+        # x *= (freq * freq * 1e-8) / (dfreq * dd * C);
+        dfreq = spectrum["freq_max"].quantity[j] - spectrum["freq_min"].quantity[j]
+        invwave = (spectrum["freq"].quantity[j] / apc.c).to(1/spectrum_wave_units)
+            spectra[column][j] += (delta_continuum * response[j] *
+            invwave * spectrum["freq"][j] / dfreq).value
+
 print("Beginning {} time steps to generate {} spectra...".format(len(times), len(spectra.columns)-2))
 # For each timestep, we send out a 'pulse' of continuum
 for step, time in enumerate(times):
@@ -635,20 +670,15 @@ for step, time in enumerate(times):
     print("Step {}: {:.2f}%".format(step, 100*step/len(times)))
     for i in range(0, len(delay_bins)-1):
         # Figure out what the bounds are for the region this pulse affects
-        time_min = time + delay_bins[i]
-        time_max = time + delay_bins[i+1]
-        for column in spectra.colnames[2:]:
+        time_range = [time + delay_bins[i], time + delay_bins[i+1]]
+        for column in spectra_line.colnames[2:]:
             # For each spectrum, if it occurs at a timestamp within this bin
-            if time_min < spectra[column].meta['time'] < time_max:
+            if time_range[0] < spectra_line[column].meta['time'] < time_range[1]:
                     # Add this pulse's contribution to it
-                    response = tf_mid.response(delay_index=i)
-                    for j in range(0, len(spectra)):
-                        # Matching the format of spectra.c line:
-                        # x *= (freq * freq * 1e-8) / (dfreq * dd * C);
-                        dfreq = spectrum["freq_max"].quantity[j] - spectrum["freq_min"].quantity[j]
-                        invwave = (spectrum["freq"].quantity[j] / apc.c).to(1/spectrum_wave_units)
-                        spectra[column][j] += (delta_continuum[step] * response[j] *
-                            invwave * spectrum["freq"][j] / dfreq).value
+                    add_step_response(  spectrum_line, spectra_line, column, delta_continuum[step],
+                                        tf_line.response(delay_index=i)  )
+                    add_step_response(  spectrum_full, spectra_full, column, delta_continuum[step],
+                                        tf_full.response(delay_index=i) )
 
 # Now we have the final spectra, add the experimental errors
 for column in spectra.colnames[2:]:
@@ -656,15 +686,17 @@ for column in spectra.colnames[2:]:
     if 'value' in column:
         for i in range(0, len(spectrum_bounds)-1):
             # For each wavelength bin in each spectrum, add a random error
-            spectra[column][i] += npr.normal(scale=spectrum['error'][i])
+            spectra_full[column][i] += npr.normal(scale=spectrum_full['error'][i])
+            spectra_line[column][i] += npr.normal(scale=spectrum_line['error'][i])
 
 
 # Write the spectra out to an easily plotted file
-ap.io.ascii.write(spectra, spectra_file, overwrite=True)
-ap.io.ascii.write(lightcurve, "lightcurve_out.dat", overwrite=True)
+ap.io.ascii.write(spectra_full, debug_spectra_file+'_full.dat', overwrite=True)
+ap.io.ascii.write(spectra_line, debug_spectra_file+'_line.dat', overwrite=True)
+ap.io.ascii.write(lightcurve, debug_lightcurve_file+'.dat', overwrite=True)
 
-output_CARAMEL(lightcurve, spectra, spectra_times, spectrum, suffix)
-output_MEMECHO(lightcurve, spectra, spectra_times, spectrum, suffix)
+output_CARAMEL(lightcurve, spectra_line, spectra_times, spectrum_line, suffix)
+output_MEMECHO(lightcurve, spectra_full, spectra_times, spectrum_full, suffix)
 
 
 # ==============================================================================
@@ -673,26 +705,28 @@ output_MEMECHO(lightcurve, spectra, spectra_times, spectrum, suffix)
 # Generate trailed spectrogram
 # ------------------------------------------------------------------------------
 print("Generating trailed spectrogram...")
-fig, (ax_ts, ax_c) = plt.subplots(1, 2, gridspec_kw={'width_ratios':[3,1]})
-pcolor_data = np.zeros([len(spectra_times), len(spectra)])
-for i, column in enumerate(spectra.colnames[2:]):
-    pcolor_data[i,:] = spectra[column]
 
-time_bounds = np.zeros(len(spectra_times)+1)
-for i in range(0, len(spectra_times)-1):
-    time_bounds[i+1] = (spectra_times['time'][i] + spectra_times['time'][i+1]).value / 2
-time_bounds[0] = (spectra_times['time'][0] - (spectra_times['time'][1] - spectra_times['time'][0]) / 2).value
-time_bounds[-1] = (spectra_times['time'][-1] + (spectra_times['time'][-1] - spectra_times['time'][-2]) / 2).value
+def generate_trailed_spectrogram(spectra, spectra_times, filename):
+    fig, (ax_ts, ax_c) = plt.subplots(1, 2, gridspec_kw={'width_ratios':[3,1]})
+    pcolor_data = np.zeros([len(spectra_times), len(spectra)])
+    for i, column in enumerate(spectra.colnames[2:]):
+        pcolor_data[i,:] = spectra[column]
 
-pcol = ax.pcolor(spectrum_bounds, time_bounds, pcolor_data)
-ax_ts.set_xlabel("λ ({})".format(spectrum_wave_units))
-ax_ts.set_ylabel("L ({})".format(spectra_times_units))
-ax_c.invert_xaxis()
-ax_c.plot(lightcurve['value'], lightcurve['time'], '-', c='m')
-ax_c.set_xlabel("Continuum luminosity ()")
+    time_bounds = np.zeros(len(spectra_times)+1)
+    for i in range(0, len(spectra_times)-1):
+        time_bounds[i+1] = (spectra_times['time'][i] + spectra_times['time'][i+1]).value / 2
+    time_bounds[0] = (spectra_times['time'][0] - (spectra_times['time'][1] - spectra_times['time'][0]) / 2).value
+    time_bounds[-1] = (spectra_times['time'][-1] + (spectra_times['time'][-1] - spectra_times['time'][-2]) / 2).value
 
-fig.colorbar(pcol).set_label("Flux ({})".format(spectrum_value_units))
-plt.savefig("{}.eps".format(trailed_spectrogram_file), bbox_inches='tight')
+    pcol = ax.pcolor(spectrum_bounds, time_bounds, pcolor_data)
+    ax_ts.set_xlabel("λ ({})".format(spectrum_wave_units))
+    ax_ts.set_ylabel("L ({})".format(spectra_times_units))
+    ax_c.invert_xaxis()
+    ax_c.plot(lightcurve['value'], lightcurve['time'], '-', c='m')
+    ax_c.set_xlabel("Continuum luminosity ()")
+
+    fig.colorbar(pcol).set_label("Flux ({})".format(spectrum_value_units))
+    plt.savefig("{}.eps".format(trailed_spectrogram_file), bbox_inches='tight')
 
 # ------------------------------------------------------------------------------
 # Generate animation
