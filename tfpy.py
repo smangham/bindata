@@ -1,22 +1,16 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import astropy as ap
-import astropy.units
 import astropy.constants as apc
 import time
 import sys
-import scipy
-import matplotlib.ticker as ti
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 import sqlalchemy
 import sqlalchemy.ext.declarative
 import sqlalchemy.orm
 import sqlalchemy.orm.query
 import matplotlib
-from sqlalchemy import and_, or_
 from astropy import units as u
-from astropy.coordinates import Angle
 
 # Constant used for rescaling data.
 # Probably already exists in apc but I don't want to faff around with units
@@ -62,11 +56,11 @@ def calculate_centroid(bins, vals, bounds=None):
         float (optional):   Lower percentile centroid, if 'bounds' passed
         float (optional):   Upper percentile centroid, if 'bounds' passed
     """
+    centroid_total = np.sum(vals)
     centroid_position = np.sum(np.multiply(bins,vals))/centroid_total
 
     if bounds is not None:
         # If we're finding bounds
-        centroid_total = np.sum(vals)
         bound_width = bounds/2
         bound_min = -1
         bound_max = -1
@@ -193,7 +187,34 @@ def doppler_shift_vel(line, wave):
 # TRANSFER FUNCTION DEFINITION
 # ==============================================================================
 class TransferFunction:
-    """Used to create, store and query emissivity and response functions"""
+    """
+    Used to create, store and query emissivity and response functions
+    """
+    def __getstate__(self):
+        """
+        Removes invalid data before saving to disk
+
+        Returns:
+            dict: Updated internal dict, with references to external,
+                  session-specific database things, removed.
+        """
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        del state['_session']
+        del state['_query']
+        del state['_database']
+        return state
+
+    def __setstate__(self, state):
+        """
+        Restores the data from disk, and sets a flag to show this is a frozen TF.
+
+        Args:
+            state (dict): The unpickled object dict..
+        """
+        self.__dict__.update(state)
+        self._unpickled = True
+
     def __init__(self, database, filename, continuum, wave_bins=None, delay_bins=None, template=None,
                     template_different_line=False, template_different_spectrum=False):
         """
@@ -231,7 +252,6 @@ class TransferFunction:
         assert (delay_bins is not None and wave_bins is not None) or template is not None,\
             "Must provide either resolutions or another TF to copy them from!"
         # self._query = database.query(Photon.Wavelength, Photon.Delay, Photon.Weight, Photon.X, Photon.Z)
-        start = time.clock()
 
         self._database = database
         Session = sqlalchemy.orm.sessionmaker(bind=self._database)
@@ -256,6 +276,7 @@ class TransferFunction:
         self._count = None
         self._wave_range = None
         self._spectrum = None
+        self._unpickled = False
 
         if template is not None:
             # If we're templating off a pre-existing transfer function, copy over all the shared properties
@@ -293,6 +314,8 @@ class TransferFunction:
         Returns:
             TransferFunction:   Self, so filters can be stacked
         """
+        assert self._unpickled is False,\
+                "TF restored from pickle! It cannot be rerun, filters cannot be applied."
         self._spectrum = number
         self._query = self._query.filter(Photon.Spectrum == number)
         return self
@@ -308,6 +331,8 @@ class TransferFunction:
         Returns:
             TransferFunction:   Self, so filters can be stacked
         """
+        assert self._unpickled is False,\
+                "TF restored from pickle! It cannot be rerun, filters cannot be applied."
         self._line_wave = wavelength
         self._line_num = number
         self._query = self._query.filter(Photon.Resonance == number)
@@ -322,6 +347,8 @@ class TransferFunction:
         Returns:
             TransferFunction:   Self, so filters can be stacked
         """
+        assert self._unpickled is False,\
+                "TF restored from pickle! It cannot be rerun, filters cannot be applied."
         assert self._line_wave is not None,\
             "Cannot limit doppler shift around a line without specifying a line!"
         self._velocity = velocity
@@ -338,6 +365,8 @@ class TransferFunction:
         Returns:
             TransferFunction:   Self, so filters can be stacked
         """
+        assert self._unpickled is False,\
+            "TF restored from pickle! It cannot be rerun, filters cannot be applied."
         assert wave_min < wave_max,\
             "Minimum wavelength must be lower than maximum wavelength!"
         self._wave_range = [wave_min, wave_max]
@@ -352,6 +381,8 @@ class TransferFunction:
         Returns:
             TransferFunction:   Self, so filters can be stacked
         """
+        assert self._unpickled is False,\
+            "TF restored from pickle! It cannot be rerun, filters cannot be applied."
         assert len(wave_range) > 2,\
             "When providing an array, it must be of more than 2 entries! Use wavelength(min, max)."
         self._bins_wave = wave_range
@@ -360,12 +391,16 @@ class TransferFunction:
         return self
 
     def lines(self, line_list):
-        assert len(lines) > 1,\
+        assert self._unpickled is False,\
+            "TF restored from pickle! It cannot be rerun, filters cannot be applied."
+        assert len(line_list) > 1,\
             "For a single line, use the 'line()' filter rather than 'lines()'!"
-        self._line_list = lines
+        self._line_list = line_list
         self._query = self._query.filter(Photon.Resonance.in_(line_list))
         return self
     def delays(self, delay_min, delay_max, days=True):
+        assert self._unpickled is False,\
+            "TF restored from pickle! It cannot be rerun, filters cannot be applied."
         assert delay_min < delay_max,\
             "Minimum delay must be below maximum delay!"
 
@@ -376,12 +411,16 @@ class TransferFunction:
         self._query=self._query.filter(Photon.Delay > self._delay_range[0], Photon.Delay < self._delay_range[1])
         return self
     def delay_dynamic_range(self, delay_dynamic_range):
+        assert self._unpickled is False,\
+            "TF restored from pickle! It cannot be rerun, filters cannot be applied."
         assert delay_dynamic_range > 0,\
             "Cannot have a negative dynamic range!"
         self._delay_dynamic_range = delay_dynamic_range
         return self
 
     def cont_scatters(self, scat_min, scat_max=None):
+        assert self._unpickled is False,\
+            "TF restored from pickle! It cannot be rerun, filters cannot be applied."
         if scat_max is not None:
             assert scat_min < scat_max,\
                 "Minimum continuum scatters must be below maximum scatters!"
@@ -394,6 +433,8 @@ class TransferFunction:
             self._query = self._query.filter(Photon.ContinuumScatters == scat_min)
         return self
     def res_scatters(self, scat_min, scat_max=None):
+        assert self._unpickled is False,\
+            "TF restored from pickle! It cannot be rerun, filters cannot be applied."
         if scat_max is not None:
             assert scat_min < scat_max,\
                 "Minimum resonant scatters must be below maximum scatters!"
@@ -407,6 +448,8 @@ class TransferFunction:
         return self
 
     def filter(self, *args):
+        assert self._unpickled is False,\
+            "TF restored from pickle! It cannot be rerun, filters cannot be applied."
         self._query=self._query.filter(args)
         return self
 
@@ -494,12 +537,14 @@ class TransferFunction:
         on the order of 1 minute per GB of input file.
 
         Args:
-            scaling_factor (float): Number of cycles in the spectra file
+            scaling_factor (float): 1/Number of cycles in the spectra file
             limit (int):            Number of photons to limit the TF to, for testing
             verbose (bool):         Whether to output exactly what the query is
         Returns:
             TransferFunction:   Self, for chaining commands
         """
+        assert self._unpickled is False,\
+            "TF restored from pickle! It cannot be rerun."
         assert self._emissivity is None,\
             "TF has already been run!"
         assert scaling_factor > 0,\
@@ -696,7 +741,6 @@ class TransferFunction:
         ax_spec = None
         ax_tf = None
         ax_resp = None
-        ax_rms = None
         # Set up the multiplot figure and axis
         fig, ((ax_spec, ax_none), (ax_tf, ax_resp)) = plt.subplots(2,2,sharex='col', sharey='row',
             gridspec_kw={'width_ratios':[3,1], 'height_ratios':[1,3]})
@@ -791,7 +835,7 @@ class TransferFunction:
         exponent_resp_text = "{}{:.0f}{}".format("{",exponent_resp,"}")
         exponent_spec_text = "{}{:.0f}{}".format("{",exponent_spec,"}")
 
-        resp = ax_resp.plot(data_plot_resp/(10**exponent_resp), bins_y_midp, c='m')
+        ax_resp.plot(data_plot_resp/(10**exponent_resp), bins_y_midp, c='m')
         ax_spec.set_ylabel(r'{}(v) $10^{}/$'.format(psi_label, exponent_spec_text)+"\n"+r'km s$^{-1}$')
         if days:
             ax_resp.set_xlabel(r'{}($\tau$) $10^{}$ / d'.format(psi_label, exponent_resp_text))
@@ -810,19 +854,19 @@ class TransferFunction:
             data_plot_rms /= np.amax(data_plot_rms)
             data_plot_spec /= np.amax(data_plot_spec)
 
-            rms = ax_spec.plot(bins_x_midp, data_plot_rms, c='c', label=r'RMS {}(v)/{:.2f}$x10^{}$'.format(psi_label, maximum_rms, exponent_rms_text))
-            spec = ax_spec.plot(bins_x_midp, data_plot_spec, c='m', label=r'{}(v)/{:.2f}$x10^{}$'.format(psi_label, maximum_spec, exponent_spec_text))
-            lg_orig = ax_spec.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
+            ax_spec.plot(bins_x_midp, data_plot_rms, c='c', label=r'RMS {}(v)/{:.2f}$x10^{}$'.format(psi_label, maximum_rms, exponent_rms_text))
+            ax_spec.plot(bins_x_midp, data_plot_spec, c='m', label=r'{}(v)/{:.2f}$x10^{}$'.format(psi_label, maximum_spec, exponent_spec_text))
+            ax_spec.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
             ax_spec.set_ylabel(r'{}(v)'.format(psi_label)+"\n"+r'km s$^{-1}$')
 
         elif response_map:
             ax_spec.axhline(0, color='grey')
             ax_resp.axvline(0, color='grey')
-            spec = ax_spec.plot(bins_x_midp, data_plot_spec/(10**exponent_spec), c='m')
+            ax_spec.plot(bins_x_midp, data_plot_spec/(10**exponent_spec), c='m')
             ax_spec.set_ylabel(r'{}(v) $10^{}/$'.format(psi_label, exponent_spec_text)+"\n"+r'km s$^{-1}$')
 
         else:
-            spec = ax_spec.plot(bins_x_midp, data_plot_spec/(10**exponent_spec), c='m')
+            ax_spec.plot(bins_x_midp, data_plot_spec/(10**exponent_spec), c='m')
             ax_spec.set_ylabel(r'{}(v) $10^{}/$'.format(psi_label, exponent_spec_text)+"\n"+r'km s$^{-1}$')
 
 
@@ -1044,7 +1088,6 @@ def do_tf_plots(tf_list_inp, dynamic_range=None, keplerian=None, name=None, file
         np.savetxt(file+"_tf_delay.txt", np.array(tf_delay,dtype='float'), header="Delay")
 
 def do_rf_plots(tf_min, tf_mid, tf_max, keplerian=None, name=None, file=None):
-    rf_delay = []
     if name is not None:
         name += '_'
     else:
