@@ -473,21 +473,22 @@ def output_MEMECHO(lightcurve, spectra, spectra_times, suffix):
 # ========== SETTINGS ==========
 # -------- TF SETTINGS ---------
 tf_lim_test = 999999999
+tf_lim_test = 359016098/2
 tf_delay_bins = 100
 tf_wave = 6562.8
 # ---- Seyfert Settings ----
 spectrum_file_sey = "sey_100.spec"
 tf_line_sey = 28
-databases_sey = { 'min':{'path':"/home/swm1n12/bindata/sey_090", 'scale':60, 'continuum': 1.043e44*0.9},
-              'mid':{'path':"/home/swm1n12/bindata/sey_100", 'scale':60, 'continuum': 1.043e44},
-              'max':{'path':"/home/swm1n12/bindata/sey_110", 'scale':60, 'continuum': 1.043e44*1.1}  }
+databases_sey = { 'min':{'path':"/Users/amsys/bindata/sey_090", 'scale':60, 'continuum': 1.043e44*0.9},
+              'mid':{'path':"/Users/amsys/bindata/sey_100", 'scale':60, 'continuum': 1.043e44},
+              'max':{'path':"/Users/amsys/bindata/sey_110", 'scale':60, 'continuum': 1.043e44*1.1}  }
 
 # ---- QSO Settings ----
 spectrum_file_qso = "qso_100.spec"
 tf_line_qso = 44
-databases_qso = { 'min':{'path':"/home/swm1n12/bindata/qso_090", 'scale':50,  'continuum': 1.043e46*0.9},
-              'mid':{'path':"/home/swm1n12/bindata/qso_100", 'scale':100, 'continuum': 1.043e46},
-              'max':{'path':"/home/swm1n12/bindata/qso_110", 'scale':50,  'continuum': 1.043e46*1.1}  }
+databases_qso = { 'min':{'path':"/Users/amsys/bindata/qso_090", 'scale':50,  'continuum': 1.043e46*0.9},
+              'mid':{'path':"/Users/amsys/bindata/qso_100", 'scale':100/2, 'continuum': 1.043e46},
+              'max':{'path':"/Users/amsys/bindata/qso_110", 'scale':50,  'continuum': 1.043e46*1.1}  }
 
 # ---- LIGHTCURVE SETTINGS -----
 lightcurve_file = "light_1158.dat"
@@ -526,7 +527,7 @@ spectra_times_units = ucds.MJD
 spectra_fudge_factor = 1
 
 # ---- VISUALIZATION & OUTPUT SETTINGS ------
-#resume_from_file = True
+resume_from_file = False
 suffix_qso = "qso"
 suffix_sey = "sey"
 output_lightcurve_file = "out_lightcurve"
@@ -602,10 +603,10 @@ def generate_spectrum_bounds(spectrum):
     bounds.append(spectrum["wave_max"][-1])
     return np.array(bounds)
 
-def generate_tf(databases, spectrum, delay_bins, line, wave, name, limit=999999999):
+def generate_tf(databases, spectrum, delay_bins, line, wave, name, limit=None):
     """
     Generates the response function for a system.
-    
+
     Arguments
         databases (Dict): Dictionary of 'min', 'mid' and 'max' data, each containing a dictionary
             with 'path' (to the file), 'continuum' (the continuum used in creation) and 'scale' (number of spectral cycles used)
@@ -613,9 +614,9 @@ def generate_tf(databases, spectrum, delay_bins, line, wave, name, limit=9999999
         delay_bins (Int): Number of bins to bin delays by
         line (Int): Python line number to select
         wave (Float): Frequency of the line selected (in A)
-        name (String): Name of the output files. 
+        name (String): Name of the output files.
         limit (Int): Number of photons to limit the DB query to. Set low for testing.
-    
+
     Returns:
         TransferFunction: The response-mapped transfer function.
     """
@@ -624,7 +625,11 @@ def generate_tf(databases, spectrum, delay_bins, line, wave, name, limit=9999999
     db_max = tfpy.open_database(databases['max']['path'], "root", "password")
 
     bounds = generate_spectrum_bounds(spectrum)
-    
+
+    #print(limit)
+    #print(spectrum)
+    #print(bounds)
+
     tf_mid = tfpy.TransferFunction( db_mid, name, continuum=databases['mid']['continuum'],
                 wave_bins=(len(bounds)-1), delay_bins=delay_bins)
     tf_mid.line(line, wave).wavelength_bins(bounds).delay_dynamic_range(2).run(
@@ -651,40 +656,40 @@ print("Generating time series begins at: {}".format(datetime.datetime.now()))
 def generate_spectra_base(spectrum, spectra_times):
     """
     Generates the base spectra for each timestep.
-    
+
     Args:
         spectrum (Table): The base, unmodified spectrum used for the output time series
         spectra_times(Table): Times to produce a spectrum for
-    
+
     Returns:
         Table: With one spectrum per target spectra time, keyed by the times
-             
+
     """
     spectra = ap.table.Table([spectrum['wave'], spectrum['value'], spectrum['error']])
     spectra.meta['bounds'] = generate_spectrum_bounds(spectrum)
-    
+
     for time in spectra_times['time']:
         # Add a base spectrum to the output spectra file
         spectra["value {}".format(time)] = spectra['value']
         spectra["value {}".format(time)].meta['time'] = time
     return spectra
 
-spectra_qso_line = generate_spectra_base(spectrum_qso_line, spectra_times)
 spectra_qso_full = generate_spectra_base(spectrum_qso_full, spectra_times)
-spectra_sey_line = generate_spectra_base(spectrum_sey_line, spectra_times)
+spectra_qso_line = generate_spectra_base(spectrum_qso_line, spectra_times)
 spectra_sey_full = generate_spectra_base(spectrum_sey_full, spectra_times)
+spectra_sey_line = generate_spectra_base(spectrum_sey_line, spectra_times)
 
 def generate_times_and_delta_continuum(transfer_function, lightcurve, delay_max):
     """
     Generates the timesteps to evaluate the TF at and the change in continuum at each
-    
+
     Arguments:
-        transfer_function (TransferFunction): The TF 
-    
-    
+        transfer_function (TransferFunction): The TF
+
+
     Returns:
         times (np.array): Time domain broken down into small steps
-    
+
     """
     # We need to evaluate at every bin-width's step
     delay_bins = (transfer_function.delay_bins() * u.s).to(lightcurve['time'].unit)
@@ -706,7 +711,7 @@ def generate_times_and_delta_continuum(transfer_function, lightcurve, delay_max)
         delta_continuum[step] = interpolation_across_range(lightcurve['time'], lightcurve['value'], time) - lightcurve.meta['mean']
 
     return times, delta_continuum
-    
+
 times_qso_full, delta_continuum_qso_full = generate_times_and_delta_continuum(tf_qso_full, lightcurve, delay_max)
 times_qso_line, delta_continuum_qso_line = generate_times_and_delta_continuum(tf_qso_line, lightcurve, delay_max)
 times_sey_full, delta_continuum_sey_full = generate_times_and_delta_continuum(tf_sey_full, lightcurve, delay_max)
@@ -724,10 +729,10 @@ def add_step_response(spectrum_step, spectrum_base, delta_continuum, response):
         spectrum_step[j] += (delta_continuum * response[j] *
             invwave * spectrum_base["freq"][j] / dfreq).value
 
-def generate_spectra_details(times, delta_continuum, transfer_function, spectra, spectrum):
+def generate_spectra_details(times, delta_continuum, transfer_function, spectra, spectrum, continuum_fit=None):
     print("Beginning {} time steps to generate {} spectra...".format(len(times), len(spectra.columns)-3))
     delay_bins = transfer_function.delay_bins() * times.unit
-    
+
     # For each timestep, we send out a 'pulse' of continuum
     for step, time in enumerate(times):
         # For each time bin this pulse is smeared out over
@@ -756,9 +761,9 @@ if resume_from_file:
     spectra_sey_full = ap.io.misc.fnunpickle(output_spectra_file+'_'+suffix_sey+'_full.pickle')
     spectra_sey_line = ap.io.misc.fnunpickle(output_spectra_file+'_'+suffix_sey+'_line.pickle')
 else:
-    generate_spectra_details(times_qso_full, delta_continuum_qso_full, tf_qso_full, spectra_qso_full, spectrum_qso_full)
+    generate_spectra_details(times_qso_full, delta_continuum_qso_full, tf_qso_full, spectra_qso_full, spectrum_qso_full, continuum_fit_qso)
     generate_spectra_details(times_qso_line, delta_continuum_qso_line, tf_qso_line, spectra_qso_line, spectrum_qso_line)
-    generate_spectra_details(times_sey_full, delta_continuum_sey_full, tf_sey_full, spectra_sey_full, spectrum_sey_full)
+    generate_spectra_details(times_sey_full, delta_continuum_sey_full, tf_sey_full, spectra_sey_full, spectrum_sey_full, continuum_fit_qso)
     generate_spectra_details(times_sey_line, delta_continuum_sey_line, tf_sey_line, spectra_sey_line, spectrum_sey_line)
     # Write the spectra out to an easily plotted file
     ap.io.misc.fnpickle( spectra_qso_full, output_spectra_file+'_'+suffix_qso+'_full.pickle')
@@ -773,10 +778,10 @@ spectra_sey_line.write(output_spectra_file+'_'+suffix_sey+'_line.dat', format='a
 
 lightcurve.write(output_lightcurve_file+'.dat', format='ascii.commented_header', overwrite=True)
 
-output_CARAMEL(lightcurve, spectra_qso_line, spectra_times, suffix_qso)
 output_MEMECHO(lightcurve, spectra_qso_full, spectra_times, suffix_qso)
-output_CARAMEL(lightcurve, spectra_sey_line, spectra_times, suffix_sey)
+output_CARAMEL(lightcurve, spectra_qso_line, spectra_times, suffix_qso)
 output_MEMECHO(lightcurve, spectra_sey_full, spectra_times, suffix_sey)
+output_CARAMEL(lightcurve, spectra_sey_line, spectra_times, suffix_sey)
 
 # ==============================================================================
 # OUTPUT VISUALIZATIONS
@@ -788,18 +793,18 @@ print("Generating trailed spectrogram begins at: {}".format(datetime.datetime.no
 def generate_trailed_spectrogram(spectra, spectra_times, filename, time_units, wave_units):
     """
     Generate a trailed spectrogram of the time series of spectra.
-    
+
     Arguments:
         spectra (Table): Spectra (starting at column 3)
         spectra_times (Table): Times to plot the TS for
-        filename (String): File to write to 
+        filename (String): File to write to
 
     Outputs:
         filename.eps: Time series output.
-    
+
     """
 
-    # We want a pcolour plot for the time series, with an adjacent 
+    # We want a pcolour plot for the time series, with an adjacent
     fig, (ax_ts, ax_c) = plt.subplots(1, 2, gridspec_kw={'width_ratios':[3,1]}, sharey=True)
     fig.subplots_adjust(hspace=0)
     pcolor_data = np.zeros([len(spectra_times), len(spectra)])
@@ -814,7 +819,7 @@ def generate_trailed_spectrogram(spectra, spectra_times, filename, time_units, w
     time_bounds[0] = (spectra_times['time'][0] - (spectra_times['time'][1] - spectra_times['time'][0]) / 2).value
     time_bounds[-1] = (spectra_times['time'][-1] + (spectra_times['time'][-1] - spectra_times['time'][-2]) / 2).value
 
-    
+
     pcol = ax_ts.pcolor(spectra.meta["bounds"], time_bounds, pcolor_data)
     ax_ts.set_xlabel("λ ({})".format(wave_units))
     ax_ts.set_ylabel("L ({})".format(time_units))
@@ -826,10 +831,10 @@ def generate_trailed_spectrogram(spectra, spectra_times, filename, time_units, w
     fig.colorbar(pcol).set_label("Flux ({})".format(spectrum_value_units))
     plt.savefig("{}.eps".format(filename), bbox_inches='tight')
 
-generate_trailed_spectrogram(spectra_qso_line, spectra_times, output_trailed_spec_file+'_'+suffix_qso+'_line', "MJD", "Å")
 generate_trailed_spectrogram(spectra_qso_full, spectra_times, output_trailed_spec_file+'_'+suffix_qso+'_full', "MJD", "Å")
-generate_trailed_spectrogram(spectra_sey_line, spectra_times, output_trailed_spec_file+'_'+suffix_sey+'_line', "MJD", "Å")
+generate_trailed_spectrogram(spectra_qso_line, spectra_times, output_trailed_spec_file+'_'+suffix_qso+'_line', "MJD", "Å")
 generate_trailed_spectrogram(spectra_sey_full, spectra_times, output_trailed_spec_file+'_'+suffix_sey+'_full', "MJD", "Å")
+generate_trailed_spectrogram(spectra_sey_line, spectra_times, output_trailed_spec_file+'_'+suffix_sey+'_line', "MJD", "Å")
 
 # ------------------------------------------------------------------------------
 # Generate animation
@@ -917,9 +922,9 @@ def generate_animation(spectra, lightcurve, lightcurve_time_name, lightcurve_val
     # Generate animation and save to file
     animation = ani.FuncAnimation(figure, update_figure, frames=len(times))
     animation.save("{}.mp4".format(filename), fps=24)
-   
+
 next_column = 3
-generate_animation(spectra_qso_line, lightcurve, "MJD", "erg s$^{-1}$ cm$^{-2}$", times_qso_full, delta_continuum_qso_full, output_animation_file+"_"+suffix_qso+'_line')
-generate_animation(spectra_qso_full, lightcurve, "MJD", "erg s$^{-1}$ cm$^{-2}$", times_qso_line, delta_continuum_qso_line, output_animation_file+"_"+suffix_qso+'_full')
-generate_animation(spectra_sey_line, lightcurve, "MJD", "erg s$^{-1}$ cm$^{-2}$", times_sey_full, delta_continuum_sey_full, output_animation_file+"_"+suffix_sey+'_line')
-generate_animation(spectra_sey_full, lightcurve, "MJD", "erg s$^{-1}$ cm$^{-2}$", times_sey_line, delta_continuum_sey_line, output_animation_file+"_"+suffix_sey+'_full')
+generate_animation(spectra_qso_full, lightcurve, "MJD", "erg s$^{-1}$ cm$^{-2}$", times_qso_full, delta_continuum_qso_full, output_animation_file+"_"+suffix_qso+'_full')
+generate_animation(spectra_qso_line, lightcurve, "MJD", "erg s$^{-1}$ cm$^{-2}$", times_qso_line, delta_continuum_qso_line, output_animation_file+"_"+suffix_qso+'_line')
+generate_animation(spectra_sey_full, lightcurve, "MJD", "erg s$^{-1}$ cm$^{-2}$", times_sey_full, delta_continuum_sey_full, output_animation_file+"_"+suffix_sey+'_full')
+generate_animation(spectra_sey_line, lightcurve, "MJD", "erg s$^{-1}$ cm$^{-2}$", times_sey_line, delta_continuum_sey_line, output_animation_file+"_"+suffix_sey+'_line')
