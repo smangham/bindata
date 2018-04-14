@@ -725,7 +725,7 @@ class TransferFunction:
 
 
     def plot(self, log=False, normalised=False, rescaled=False, velocity=False, name=None, days=True,
-             response_map=False, keplerian=None, dynamic_range=None, RMS=False):
+             response_map=False, keplerian=None, dynamic_range=None, RMS=False, show=False):
         """Takes the data gathered by calling 'run' and outputs a plot"""
         assert response_map is False or self._response is not None,\
             "No data available for response map!"
@@ -968,6 +968,9 @@ class TransferFunction:
         else:
             plt.savefig("{}_{}.eps".format(self._filename, name), bbox_inches='tight')
         print("Successfully plotted ({:.1f}s)".format(time.clock()-start))
+
+        if show:
+            fig.show()
         plt.close(fig)
         return self
 
