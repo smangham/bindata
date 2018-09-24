@@ -44,7 +44,7 @@ def generate_spectrum_bounds(spectrum):
     return np.array(bounds)
 
 
-def generate_tf(databases, spectrum, delay_bins, line, wave, name, limit=999999999):
+def generate_tf(databases, spectrum, delay_bins, line, wave, name, limit=999999999, dynamic_range=2):
     """
     Generates the response function for a system.
 
@@ -69,7 +69,7 @@ def generate_tf(databases, spectrum, delay_bins, line, wave, name, limit=9999999
 
     tf_mid = tfpy.TransferFunction(db_mid, name, continuum=databases['mid']['continuum'],
                 wave_bins=(len(bounds)-1), delay_bins=delay_bins)
-    tf_mid.line(line, wave).wavelength_bins(bounds).delay_dynamic_range(2).run(
+    tf_mid.line(line, wave).wavelength_bins(bounds).delay_dynamic_range(dynamic_range).run(
                 scaling_factor=databases['mid']['scale'], limit=limit,verbose=True).plot()
     tf_min = tfpy.TransferFunction(db_min, name+'_min', continuum=databases['min']['continuum'], template=tf_mid).run(
                 scaling_factor=databases['min']['scale'], limit=limit).plot()
@@ -148,6 +148,7 @@ def generate_times_and_delta_continuum(transfer_function, lightcurve, delay_max)
 
 def generate_spectra_min_max(times, transfer_function, spectra, spectrum,
                              continuum_fit=None):
+    # TODO: Correct this! Unfortunately it's mis-set in the data we sent out
     delay_bins = transfer_function.delay_bins()
     dC_max = np.amax(times['dC'])
     dC_min = np.amin(times['dC'])
@@ -299,9 +300,17 @@ def generate_spectra_error(spectra,
     return apply_spectra_error(spectra)
 
 
-def copy_spectra_error(origin, target):
+def copy_spectra_error(origin, target, rescale=False):
     # Copy across errors and apply them
-    target['error'] = origin['error'][0]
+    if not rescale:
+        target['error'] = origin['error'][0]
+
+    else:
+        max_origin = np.argmax(origin['value'])
+        max_target = np.argmax(target['value'])
+        rescaled_error = origin['error'][0] * target['value'][max_target] / origin['value'][max_origin]
+        target['error'] = rescaled_error
+
     return apply_spectra_error(target)
 
 

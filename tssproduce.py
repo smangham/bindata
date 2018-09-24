@@ -85,20 +85,25 @@ output_animation_file = "out_anim"
 
 is_reversed = False
 visualise_outputs = False
+visualise_animation = False
+visualise_clean = False
+visualise_rescaled_tfs = True
+visualise_rescaled_tfs_max = 30
+time_series_outputs = False
 
 # --------- RESCALING ----------
 delay_max = 90 * u.d
 delta_continuum_range = 0.50
 
 # --------- ERRORS ---------
-error_ratio_to_variation = 0.01
+error_ratio_to_variation = 0.020
 
 # ------ PICKLES ------
 pickle_tf_file = 'pickle_tf'
 pickle_spectra_file = 'pickle_spectra'
 pickle_times_file = 'pickle_times'
 use_pickled_tf = True
-use_pickled_times = True # If set to true, won't change continuum range!
+use_pickled_times = True  # If set to true, won't change continuum range!
 use_pickled_spectra = True
 
 stop_at_min_max = False
@@ -291,7 +296,7 @@ else:
     # and keep clean copies of each.
     spectra_qso_line_clean = tss_process.generate_spectra_error(spectra=spectra_qso_line, error=error_ratio_to_variation)
     spectra_qso_full_clean = tss_process.copy_spectra_error(origin=spectra_qso_line, target=spectra_qso_full)
-    spectra_sey_line_clean = tss_process.generate_spectra_error(spectra=spectra_sey_line, error=error_ratio_to_variation)
+    spectra_sey_line_clean = tss_process.copy_spectra_error(origin=spectra_qso_line, target=spectra_sey_line, rescale=True)
     spectra_sey_full_clean = tss_process.copy_spectra_error(origin=spectra_sey_line, target=spectra_sey_full)
 
     # Pickle the spectra to be used later
@@ -319,10 +324,11 @@ else:
     spectra_times_sey.write(output_times_line_file+'_sey.dat', format='ascii', overwrite=True)
     spectra_times_qso.write(output_times_line_file+'_qso.dat', format='ascii', overwrite=True)
 
-tss_output.CARAMEL(lightcurve_qso, spectra_qso_line, spectra_times, suffix_qso)
-tss_output.MEMECHO(lightcurve_qso, spectra_qso_full, spectra_times, suffix_qso)
-tss_output.CARAMEL(lightcurve_sey, spectra_sey_line, spectra_times, suffix_sey)
-tss_output.MEMECHO(lightcurve_sey, spectra_sey_full, spectra_times, suffix_sey)
+if time_series_outputs:
+    tss_output.CARAMEL(lightcurve_qso, spectra_qso_line, spectra_times, suffix_qso)
+    tss_output.MEMECHO(lightcurve_qso, spectra_qso_full, spectra_times, suffix_qso)
+    tss_output.CARAMEL(lightcurve_sey, spectra_sey_line, spectra_times, suffix_sey)
+    tss_output.MEMECHO(lightcurve_sey, spectra_sey_full, spectra_times, suffix_sey)
 
 # ==============================================================================
 # OUTPUT VISUALIZATIONS
@@ -335,21 +341,39 @@ if visualise_outputs:
     tss_output.trailed_spectrogram(spectra_qso_full, lightcurve_qso, spectra_times, output_trailed_spec_file+'_'+suffix_qso+'_full')
     tss_output.trailed_spectrogram(spectra_sey_line, lightcurve_sey, spectra_times, output_trailed_spec_file+'_'+suffix_sey+'_line')
     tss_output.trailed_spectrogram(spectra_sey_full, lightcurve_sey, spectra_times, output_trailed_spec_file+'_'+suffix_sey+'_full')
-    tss_output.trailed_spectrogram(spectra_qso_line_clean, lightcurve_qso, spectra_times, output_trailed_spec_file+'_'+suffix_qso+'_line_clean')
-    tss_output.trailed_spectrogram(spectra_qso_full_clean, lightcurve_qso, spectra_times, output_trailed_spec_file+'_'+suffix_qso+'_full_clean')
-    tss_output.trailed_spectrogram(spectra_sey_line_clean, lightcurve_sey, spectra_times, output_trailed_spec_file+'_'+suffix_sey+'_line_clean')
-    tss_output.trailed_spectrogram(spectra_sey_full_clean, lightcurve_sey, spectra_times, output_trailed_spec_file+'_'+suffix_sey+'_full_clean')
+
+    tss_output.plot_spectra_rms([spectra_qso_line_clean, spectra_sey_line_clean],
+                                 ['out_specrms_qso', 'out_specrms_sey'])
+
+
+    if visualise_clean:
+        tss_output.trailed_spectrogram(spectra_qso_line_clean, lightcurve_qso, spectra_times, output_trailed_spec_file+'_'+suffix_qso+'_line_clean')
+        tss_output.trailed_spectrogram(spectra_qso_full_clean, lightcurve_qso, spectra_times, output_trailed_spec_file+'_'+suffix_qso+'_full_clean')
+        tss_output.trailed_spectrogram(spectra_sey_line_clean, lightcurve_sey, spectra_times, output_trailed_spec_file+'_'+suffix_sey+'_line_clean')
+        tss_output.trailed_spectrogram(spectra_sey_full_clean, lightcurve_sey, spectra_times, output_trailed_spec_file+'_'+suffix_sey+'_full_clean')
+
+if visualise_rescaled_tfs:
+    # tf_qso_resc = tss_process.generate_tf(databases_qso, spectrum_qso_line, 25, tf_line_qso, tf_wave, 'out_qso_resc', 10000, dynamic_range=1.5)
+    # tf_sey_resc = tss_process.generate_tf(databases_sey, spectrum_sey_line, 25, tf_line_sey, tf_wave, 'out_sey_resc', 10000, dynamic_range=1.5)
+
+    tss_output.rescaled_rfs([tf_qso_line, tf_sey_line],
+                            rescale_max_time=delay_max.value,
+                            figure_max_time=delay_max.value/2.5,
+                            keplerian={
+                                'angle':40, 'mass': 1.33e8, 'radius': [50, 100]
+                            })
 
 # ------------------------------------------------------------------------------
 # Generate animation
 # ------------------------------------------------------------------------------
-if visualise_outputs:
+if visualise_animation:
     print("Generating animation begins at: {}".format(datetime.datetime.now()))
     tss_output.animation(spectra_qso_full, lightcurve_qso, spectra_times, times_qso_full, output_animation_file+"_qso_full")
     tss_output.animation(spectra_qso_line, lightcurve_qso, spectra_times, times_qso_line, output_animation_file+"_qso_line")
     tss_output.animation(spectra_sey_full, lightcurve_sey, spectra_times, times_sey_full, output_animation_file+"_sey_full")
     tss_output.animation(spectra_sey_line, lightcurve_sey, spectra_times, times_sey_line, output_animation_file+"_sey_line")
-    tss_output.animation(spectra_qso_full_clean, lightcurve_qso, spectra_times, times_qso_full, output_animation_file+"_qso_full_clean")
-    tss_output.animation(spectra_qso_line_clean, lightcurve_qso, spectra_times, times_qso_line, output_animation_file+"_qso_line_clean")
-    tss_output.animation(spectra_sey_full_clean, lightcurve_sey, spectra_times, times_sey_full, output_animation_file+"_sey_full_clean")
-    tss_output.animation(spectra_sey_line_clean, lightcurve_sey, spectra_times, times_sey_line, output_animation_file+"_sey_line_clean")
+    if visualise_clean:
+        tss_output.animation(spectra_qso_full_clean, lightcurve_qso, spectra_times, times_qso_full, output_animation_file+"_qso_full_clean")
+        tss_output.animation(spectra_qso_line_clean, lightcurve_qso, spectra_times, times_qso_line, output_animation_file+"_qso_line_clean")
+        tss_output.animation(spectra_sey_full_clean, lightcurve_sey, spectra_times, times_sey_full, output_animation_file+"_sey_full_clean")
+        tss_output.animation(spectra_sey_line_clean, lightcurve_sey, spectra_times, times_sey_line, output_animation_file+"_sey_line_clean")

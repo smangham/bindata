@@ -138,7 +138,7 @@ def calculate_delay(angle, phase, radius, days=True):
         float:          Delay relative to continuum
     """
     vr_disk   = np.array([radius*np.cos(phase), 0.0])
-    vr_normal = np.array([np.cos(angle), np.sin(angle)])
+    vr_normal = np.array([np.sin(angle), np.cos(angle)])
     vr_plane  = radius * vr_normal
     if days:
         return (np.dot((vr_plane - vr_disk), vr_normal) / apc.c.value) / seconds_per_day
@@ -621,7 +621,7 @@ class TransferFunction:
 
         # Check if we've already got velocity bins from another TF and we have a line to center around
         if self._bins_vel is None and self._line_wave is not None:
-            range_wave = [self._bins_wave[0], self._bins_wave[1]]
+            range_wave = [self._bins_wave[0], self._bins_wave[-1]]
             self._bins_vel = np.linspace(doppler_shift_vel(self._line_wave, range_wave[1]),
                                          doppler_shift_vel(self._line_wave, range_wave[0]),
                                          self._bins_wave_count+1, endpoint=True, dtype=np.float64)
@@ -725,7 +725,8 @@ class TransferFunction:
 
 
     def plot(self, log=False, normalised=False, rescaled=False, velocity=False, name=None, days=True,
-             response_map=False, keplerian=None, dynamic_range=None, RMS=False, show=False):
+             response_map=False, keplerian=None, dynamic_range=None, RMS=False, show=False,
+             max_delay=None):
         """Takes the data gathered by calling 'run' and outputs a plot"""
         assert response_map is False or self._response is not None,\
             "No data available for response map!"
@@ -850,7 +851,13 @@ class TransferFunction:
         exponent_spec_text = "{}{:.0f}{}".format("{", exponent_spec, "}")
 
         ax_resp.plot(data_plot_resp/(10**exponent_resp), bins_y_midp, c='m')
-        ax_spec.set_ylabel(r'{}(v) $10^{}/$'.format(psi_label, exponent_spec_text)+"\n"+r'km s$^{-1}$')
+
+        print('Ax-spec label:', velocity)
+        if velocity:
+            ax_spec.set_ylabel(r'{}(v) $10^{}/$'.format(psi_label, exponent_spec_text)+"\n"+r'km s$^{-1}$')
+        else:
+            ax_spec.set_ylabel(r'{}($\lambda$) $10^{}/$'.format(psi_label, exponent_spec_text)+"\n"+r'$\AA$')
+
         if days:
             ax_resp.set_xlabel(r'{}($\tau$) $10^{}$ / d'.format(psi_label, exponent_resp_text))
         else:
@@ -871,17 +878,14 @@ class TransferFunction:
             ax_spec.plot(bins_x_midp, data_plot_rms, c='c', label=r'RMS {}(v)/{:.2f}$x10^{}$'.format(psi_label, maximum_rms, exponent_rms_text))
             ax_spec.plot(bins_x_midp, data_plot_spec, c='m', label=r'{}(v)/{:.2f}$x10^{}$'.format(psi_label, maximum_spec, exponent_spec_text))
             ax_spec.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
-            ax_spec.set_ylabel(r'{}(v)'.format(psi_label)+"\n"+r'km s$^{-1}$')
 
         elif response_map:
             ax_spec.axhline(0, color='grey')
             ax_resp.axvline(0, color='grey')
             ax_spec.plot(bins_x_midp, data_plot_spec/(10**exponent_spec), c='m')
-            ax_spec.set_ylabel(r'{}(v) $10^{}/$'.format(psi_label, exponent_spec_text)+"\n"+r'km s$^{-1}$')
 
         else:
             ax_spec.plot(bins_x_midp, data_plot_spec/(10**exponent_spec), c='m')
-            ax_spec.set_ylabel(r'{}(v) $10^{}/$'.format(psi_label, exponent_spec_text)+"\n"+r'km s$^{-1}$')
 
         # If this is a log plot, take log and correct label and limits
         if log:
@@ -917,60 +921,99 @@ class TransferFunction:
         # Plot the main colourplot for the transfer function
         tf = ax_tf.pcolor(bins_x, bins_y, data_plot,
                           vmin=cb_min, vmax=cb_max, cmap=cb_map)
-        ax_tf.set_ylim(bottom=bins_y[0], top=bins_y[-1])
+        if not max_delay:
+            ax_tf.set_ylim(bottom=bins_y[0], top=bins_y[-1])
+        else:
+            ax_tf.set_ylim(bottom=bins_y[0], top=max_delay)
         ax_tf.set_xlim(left=bins_x[0], right=bins_x[-1])
         ax_tf.set_aspect('auto')
 
         # Add lines for keplerian rotational outflows
         if keplerian is not None:
+            print('Keplerian!?', keplerian)
             resolution = 1000
+            scale_factor = keplerian.get('rescale', 1)
             r_angle    = np.radians(keplerian["angle"])
             r_mass_bh  = keplerian["mass"] * apc.M_sun.value
             r_rad_grav = (6 * apc.G.value * r_mass_bh / np.power(apc.c.value, 2))
             ar_wave    = np.zeros(resolution)  # * u.angstrom
             ar_delay   = np.zeros(resolution)  # * u.s
             ar_phase   = np.linspace(0, np.pi*2, resolution)
-            ar_rad     = np.linspace(keplerian["radius"][0]*r_rad_grav, keplerian["radius"][1]*r_rad_grav,resolution)
+            ar_rad     = np.linspace(keplerian["radius"][0]*r_rad_grav, 20*keplerian["radius"][1]*r_rad_grav, resolution)
             ar_vel     = np.zeros(resolution)
             r_rad_min  = r_rad_grav * keplerian["radius"][0]
+            r_rad_max  = r_rad_grav * keplerian["radius"][1]
+            r_vel_min  = keplerian_velocity(r_mass_bh, r_rad_max)
             r_vel_max  = keplerian_velocity(r_mass_bh, r_rad_min)
 
-
+            print('mass',r_mass_bh)
+            print('r g', r_rad_grav)
+            print('r inn', r_rad_min)
+            print('r out', r_rad_max)
+            print('v inn', r_vel_max)
+            print('v out', r_vel_min)
+            print('w inn', doppler_shift_wave(self._line_wave, r_vel_max))
+            print('w out', doppler_shift_wave(self._line_wave, r_vel_min))
 
             # ITERATE OVER INNER EDGE
             for r_phase, r_wave, r_delay, r_vel in np.nditer([ar_phase, ar_wave, ar_delay, ar_vel], op_flags=['readwrite']):
                 r_vel[...]   = r_vel_max * np.sin(r_phase) * np.sin(r_angle) / (1e3 * x_bin_mult)
-                r_wave[...]  = doppler_shift_wave(self._line_wave, r_vel )
+                # r_vel[...]   = r_vel_max * np.sin(r_phase) * 1 / (1e3 * x_bin_mult)
+                r_wave[...]  = doppler_shift_wave(self._line_wave, r_vel * 1e3 * x_bin_mult)
                 r_delay[...] = calculate_delay(r_angle, r_phase, r_rad_min, u.day)
-            ax_tf.plot(ar_vel, ar_delay, '-', c='m')
+            if velocity:
+                ax_tf.plot(ar_vel, ar_delay, '-', c='m')
+            else:
+                ax_tf.plot(ar_wave, ar_delay, '-', c='m')
+
+            # # ITERATE OVER OUTER EDGE
+            # for r_phase, r_wave, r_delay, r_vel in np.nditer([ar_phase, ar_wave, ar_delay, ar_vel], op_flags=['readwrite']):
+            #     r_vel[...]   = r_vel_min * np.sin(r_phase) * np.sin(r_angle) / (1e3 * x_bin_mult)
+            #     # r_vel[...]   = r_vel_min * np.sin(r_phase) * 1 / (1e3 * x_bin_mult)
+            #     r_wave[...]  = doppler_shift_wave(self._line_wave, r_vel * 1e3 * x_bin_mult)
+            #     r_delay[...] = calculate_delay(r_angle, r_phase, r_rad_max, u.day)
+            # if velocity:
+            #     ax_tf.plot(ar_vel, ar_delay, '-', c='m')
+            # else:
+            #     ax_tf.plot(ar_wave, ar_delay, '-', c='m')
 
             # ITERATE OVER BLUE BOUND
             for r_rad, r_wave, r_delay, r_vel in np.nditer([ar_rad, ar_wave, ar_delay, ar_vel], op_flags=['readwrite']):
                 r_rad        = r_rad  # * u.m
                 r_vel[...]   = keplerian_velocity(r_mass_bh, r_rad) * np.sin(r_angle) / (1e3 * x_bin_mult)
-                r_wave[...]  = doppler_shift_wave(self._line_wave, r_vel )
-                r_delay[...] = calculate_delay(r_angle, np.pi/2, r_rad, u.day )
-            ax_tf.plot(ar_vel, ar_delay, '-', c='m')
+                # r_vel[...]   = keplerian_velocity(r_mass_bh, r_rad) * 1 / (1e3 * x_bin_mult)
+                r_wave[...]  = doppler_shift_wave(self._line_wave, r_vel * 1e3 * x_bin_mult)
+                r_delay[...] = calculate_delay(r_angle, np.pi/2, r_rad, u.day)
+            if velocity:
+                ax_tf.plot(ar_vel, ar_delay, '-', c='m')
+            else:
+                ax_tf.plot(ar_wave, ar_delay, '-', c='m')
 
             # ITERATE OVER RED BOUND
             for r_rad, r_wave, r_delay, r_vel in np.nditer([ar_rad, ar_wave, ar_delay, ar_vel], op_flags=['readwrite']):
                 r_rad        = r_rad  # * u.m
                 r_vel[...]   = -keplerian_velocity(r_mass_bh, r_rad) * np.sin(r_angle) / (1e3 * x_bin_mult)
-                r_wave[...]  = doppler_shift_wave(self._line_wave, r_vel)
+                # r_vel[...]   = -keplerian_velocity(r_mass_bh, r_rad) * 1 / (1e3 * x_bin_mult)
+                r_wave[...]  = doppler_shift_wave(self._line_wave, r_vel * 1e3 * x_bin_mult)
                 r_delay[...] = calculate_delay(r_angle, np.pi/2, r_rad, u.day)
-            ax_tf.plot(ar_vel, ar_delay, '-', c='m')
+            if velocity:
+                ax_tf.plot(ar_vel, ar_delay, '-', c='m')
+            else:
+                ax_tf.plot(ar_wave, ar_delay, '-', c='m')
 
         cbar = plt.colorbar(tf, orientation="vertical")
         cbar.set_label(cb_label+cb_label_vars+cb_label_scale+cb_label_units)
 
         if name is None:
             plt.savefig("{}.eps".format(self._filename), bbox_inches='tight')
+            print("Successfully plotted '{}.eps'({:.1f}s)".format(self._filename, time.clock()-start))
         else:
             plt.savefig("{}_{}.eps".format(self._filename, name), bbox_inches='tight')
-        print("Successfully plotted ({:.1f}s)".format(time.clock()-start))
+            print("Successfully plotted '{}_{}.eps'({:.1f}s)".format(self._filename, name, time.clock()-start))
 
         if show:
             fig.show()
+
         plt.close(fig)
         return self
 

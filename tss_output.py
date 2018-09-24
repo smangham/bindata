@@ -2,7 +2,7 @@
 .. module:: tss_output
    :synopsis: Manages output for the time series of spectra code.
 
-.. moduleauthor:: Sam Manghamr <s.w.mangham@soton.ac.uk>
+.. moduleauthor:: Sam Mangham <s.w.mangham@soton.ac.uk>
 
 
 """
@@ -146,7 +146,12 @@ def trailed_spectrogram(spectra, lightcurve, spectra_times, filename):
     """
 
     # We want a pcolour plot for the time series, with an adjacent
-    fig, (ax_ts, ax_c) = plt.subplots(1, 2, gridspec_kw={'width_ratios': [3, 1]}, sharey=True)
+    # fig, (ax_ts, ax_c) = plt.subplots(1, 2, gridspec_kw={'width_ratios': [3, 1]} , sharey=True)
+    fig, ((ax_spec, ax_none), (ax_ts, ax_c)) = plt.subplots(2, 2, sharex='col', sharey='row',
+            gridspec_kw={'width_ratios': [3,1], 'height_ratios': [1, 3]})
+    ax_none.axis('off')
+
+
     pcolor_data = np.zeros([len(spectra_times), len(spectra)])
     for i, column in enumerate(spectra.colnames[5:]):
         pcolor_data[i, :] = spectra[column]
@@ -160,17 +165,26 @@ def trailed_spectrogram(spectra, lightcurve, spectra_times, filename):
     time_bounds[-1] = (spectra_times['time'][-1] + (spectra_times['time'][-1] - spectra_times['time'][-2]) / 2)
 
     # Now we do the pcolour plot, with the *true* lightcurve along the side. Maybe we truncate or remove this...
-    pcol = ax_ts.pcolor(spectra.meta["bounds"], time_bounds, pcolor_data)
-    ax_ts.set_xlabel("λ ({})".format(spectra['wave'].meta['name']))
-    ax_ts.set_ylabel("Time ({})".format(spectra_times['time'].meta['name']))
+    pcol = ax_ts.pcolor(spectra.meta["bounds"], time_bounds, pcolor_data/np.amax(pcolor_data))
+    ax_ts.set_ylabel("Time (MJD)")
     ax_ts.set_ylim(time_bounds[0], time_bounds[-1])
-    ax_c.invert_xaxis()
-    ax_c.plot(lightcurve['value'], lightcurve['time'], '-', c='m')
-    ax_c.set_xlabel("Continuum")
-    ax_c.set_yticklabels([])
+    ax_ts.xaxis.set_tick_params(rotation=0, pad=1)
+    ax_ts.yaxis.set_tick_params(rotation=90)
+    ax_ts.yaxis.tick_left()
+    ax_ts.set_xlim([6300, 6850])
 
-    fig.colorbar(pcol).set_label("Flux ({})".format(spectra['value'].meta['name']))
-    fig.subplots_adjust(wspace=0)
+    ax_spec.set_xlim([6300, 6850])
+    ax_spec.set_xlabel("λ (Å)")
+    ax_spec.set_ylabel(r'$L/L_{\rm max}$')
+    ax_spec.plot(spectra['wave'], spectra['value']/np.amax(spectra['value']))
+
+    ax_c.invert_xaxis()
+    ax_c.plot(100*(lightcurve['value']-np.mean(lightcurve['value']))/np.mean(lightcurve['value']), lightcurve['time'], '-', c='m')
+    ax_c.xaxis.set_tick_params(rotation=0, pad=12)
+    ax_c.set_xlabel(r"ΔC (%)")
+
+    fig.colorbar(pcol).set_label(r"$L/L_{max}$")
+    fig.subplots_adjust(wspace=0, hspace=0)
     plt.savefig("{}.eps".format(filename), bbox_inches='tight')
     plt.close(fig)
 
@@ -260,3 +274,41 @@ def animation(spectra, lightcurve, spectra_times, times, filename, is_reversed=F
     animation = ani.FuncAnimation(figure, update_figure, frames=len(times))
     animation.save("{}.mp4".format(filename), fps=24)
     plt.close(figure)
+
+
+def rescaled_rfs(tfs, rescale_max_time, figure_max_time, keplerian=None):
+    for tf in tfs:
+        delay_bins = (tf.delay_bins() * u.s).to(u.day)
+        print('Rescale factor is:', (rescale_max_time / delay_bins[-1]).value)
+        tf._bins_delay *= (rescale_max_time / delay_bins[-1]).value
+        keplerian['rescale'] = (rescale_max_time / delay_bins[-1]).value
+        tf.plot(response_map=True, name='resp', max_delay=figure_max_time,
+                keplerian=keplerian)
+
+def plot_spectra_rms(spectra, filenames):
+    for (spec_full, spec_line), filename in zip(spectra, filenames):
+        fig, (ax_full, ax_line) = plt.subplots(2, 1, sharex=True)
+        plt.tight_layout()
+        fig.subplots_adjust(hspace=0, wspace=0)
+        fig.legend()
+
+        ax_line.set_ylabel("Spectrum ({})".format(spec_line['value'].meta['name']))
+        ax_line.set_xlabel("λ ({})".format(spec_line['wave'].meta['name']))
+
+        full_series = np.array([spec_full[column] for column in spec_full.columns[5:]])
+        line_series = np.array([spec_line[column] for column in spec_line.columns[5:]])
+
+        rms_full = np.sqrt(np.sum(np.square(full_series), 1) / len(spec_full))
+        rms_line = np.sqrt(np.sum(np.square(line_series), 1) / len(spec_line))
+
+        ax_full.errorbar(spec_full['wave'], spec_full['value'],
+                         fmt='-', c='r', yerr=spec_full['error'], label='Spectrum')
+        ax_full.errorbar(spec_full['wave'], rms_full,
+                         fmt='-', c='b', label='RMS')
+        ax_line.errorbar(spec_line['wave'], spec_line['value'],
+                         fmt='-', c='r', yerr=spec_line['error'], label='Spectrum')
+        ax_line.errorbar(spec_line['wave'], rms_line,
+                         fmt='-', c='b', label='RMS')
+
+        plt.savefig("{}.eps".format(filename), bbox_inches='tight')
+        plt.close(fig)

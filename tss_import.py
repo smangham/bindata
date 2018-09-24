@@ -4,6 +4,7 @@ import astropy as ap
 import astropy.constants as apc
 import astropy.table as apt
 from astropy import units as u
+from astropy.units import cds as ucds
 
 import numpy as np
 
@@ -335,3 +336,55 @@ def spectrum(spectrum_file, bins, values, frequency=True, limits=None,
         return [spectrum, continuum_fit]
     else:
         return spectrum
+
+
+def import_caramel(caramel_line_file, caramel_spectra_file):
+    """
+    Routine to import CARAMEL output spectra into the same spectra format as tss_process creates.
+    """
+    print("Importing CARAMEL files")
+
+    caramel_line = ap.table.Table.read(caramel_line_file, format='ascii',
+                                       names=['time', 'value', 'error'])
+    caramel_line['time'].unit = u.s
+
+    caramel_spectra_stream = open(caramel_spectra_file)
+
+    lines = caramel_spectra_stream.readlines()
+    np_lines = []
+    for line in lines[1:]:
+        np_lines.append(np.array([float(x) for x in line.strip().split()]))
+
+    # CARAMEL spectra all start at an arbibtary value, they have no zeroes. So remove this.
+    # caramel_min = 999999999
+    # for time_index in range(len(caramel_line)):
+    #     if np.amin(np_lines[1+time_index*2]) < caramel_min:
+    #         caramel_min = np.amin(np_lines[1+time_index*2])
+    caramel_min = 1
+
+    caramel_spectra = ap.table.Table()  # Line 0 is a comment
+    caramel_spectra['wave'] = np_lines[0]  # Wavelengths
+    caramel_spectra['wave'].unit = u.angstrom
+    caramel_spectra['value'] = np.zeros(len(np_lines[0]))  # Dummy for mean
+    caramel_spectra['error'] = np_lines[2]  # Dummy for error
+    caramel_spectra['value_min'] = np_lines[1]  # Dummy for min
+    caramel_spectra['value_max'] = np_lines[1]  # Dummy for max
+
+    # Read the spectra for each time-step
+    for time_index in range(len(caramel_line)):
+        print(time_index, '/', len(caramel_line))
+        time = caramel_line['time'].quantity[time_index].to(ucds.MJD)
+        spectra_index = 1 + (time_index * 2)  # The first line is wave, rest are spectra
+        caramel_spectra['value {}'.format(time)] = np_lines[spectra_index] - caramel_min
+        caramel_spectra['error {}'.format(time)] = np_lines[spectra_index+1]
+        caramel_spectra['value {}'.format(time)].meta['name'] = 'CARAMEL'
+        caramel_spectra["value {}".format(time)].meta['time'] = time
+
+        # Add this column to create the mean
+        caramel_spectra['value'] += np_lines[spectra_index] - caramel_min
+
+    caramel_spectra['value'] /= len(caramel_line)
+
+    # The summed line flux includes the caramel forced minimum for everything
+    caramel_line['value'] -= (caramel_min) * len(caramel_spectra)
+    return caramel_line, caramel_spectra
